@@ -1,0 +1,41 @@
+{
+  "name": "tg-app",
+  "version": "1.0.0",
+  "description": "Private Rope Jam event companion for Telegram and web",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "lucide-react": "1.23.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "@workos-inc/authkit-react": "0.16.3"
+  },
+  "overrides": {
+    "esbuild@^0.25.0": "0.25.10",
+    "yocto-queue@^1.0.0": "1.2.1",
+    "vitest": {
+      "vite": "5.4.20"
+    }
+  },
+  "devDependencies": {
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "@vitejs/plugin-react": "5.0.4",
+    "typescript": "5.9.3",
+    "vite": "7.1.9",
+    "vitest": "1.6.1"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
