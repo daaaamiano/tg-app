@@ -37,6 +37,7 @@ import {
   telegramLaunchUrl,
 } from "./lib/telegram";
 import type { AuthSession, EventData, RopeEvent } from "./types/event";
+import { isLoginPath } from "./lib/paths";
 
 type View = "event" | "events";
 
@@ -70,7 +71,7 @@ export default function App() {
   const [period, setPeriod] = useState<EventPeriod>("upcoming");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAccount, setShowAccount] = useState(
-    () => window.location.pathname === "/login"
+    () => isLoginPath(window.location.pathname)
   );
   const [localAuth, setLocalAuth] = useState<AuthSession | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
@@ -403,9 +404,9 @@ export default function App() {
             <p>No gatherings announced yet.</p>
           </section>
         ) : (
-          <>
+          <div className="event-page">
+            <RopeParallax />
             <section className="event-hero">
-              <RopeParallax />
               <div className="hero-copy">
                 <div className="hero-eyebrow">
                   <span className="status-dot" />
@@ -623,7 +624,7 @@ export default function App() {
                 Browse all events <ArrowUpRight size={16} />
               </button>
             </section>
-          </>
+          </div>
         )}
       </main>
 

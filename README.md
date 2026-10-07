@@ -24,7 +24,7 @@ Open http://127.0.0.1:5178. `npm run build` creates `dist/`, and `npm test` runs
 
 The details come from the supplied poster and organizer instructions. The photo is used as provided at `public/private-rope-jam-poster.jpg`. No attendee identities are shown. House rules include an adults-only agreement.
 
-The homepage includes a decorative SVG rope parallax effect responding to scrolling and mouse movement. It is disabled when reduced motion is preferred. The poster itself is unchanged.
+A single red thread winds through the homepage margins with gentle continuous drift, scroll parallax, and mouse movement. A fixed mask leaves breathing room around the text and poster, including after responsive layout changes. Separate desktop and portrait phone paths keep it visible on both. On phones, the mask follows individual text lines, and stronger idle drift and scroll movement work without a mouse or touch permissions. Movement stops when reduced motion is preferred or the tab is hidden. The poster itself is unchanged.
 
 **All events** has Upcoming and Past views. There is only one announced event; no fake history or future dates. Events move to Past after their end time, using timestamp offsets. Add actual events in `src/data/event.ts`; `src/lib/events.ts` handles ordering, local-time display, and calendar export.
 
@@ -69,7 +69,7 @@ The browser integration uses the official `@workos-inc/authkit-react` SDK with t
 
 `.env.local` is ignored by Git. Keep `.env.example` as the shareable template. `VITE_` variables are public: **never place a WorkOS secret API key (`sk_…`), Telegram bot token, or cookie encryption secret in this frontend.** Future server credentials belong in the backend's private environment.
 
-The app explicitly uses the current origin's `/` as the OAuth callback and the `/login` route to begin login from invitation/reset links. On static hosting, rewrite `/login` to `index.html`. Do not mix `localhost` and `127.0.0.1`: if you use `localhost`, add that origin and its corresponding redirect/sign-out/login URLs too.
+The app uses Vite's base path as the OAuth callback and the `login` route under that path to begin login from invitation/reset links. On static hosting, serve that login route with `index.html`; the Pages workflow creates `login/index.html` for this purpose. Do not mix `localhost` and `127.0.0.1`: if you use `localhost`, add that origin and its corresponding redirect/sign-out/login URLs too.
 
 ### Hosted web environments
 
@@ -115,4 +115,34 @@ API requests include credentials. Configure exact CORS origins, suitable secure 
 
 ## Deployment
 
-Build with `npm run build`, then serve `dist/` over HTTPS. Rewrite `/login` to `index.html` for AuthKit's login initiation flow. Set the production environment's WorkOS origin/redirects and configure a custom authentication domain as described above. `VITE_` settings are public and are included at build time; never include secret keys or bot tokens. No hosting or bot configuration is performed automatically.
+### GitHub Pages from `main`
+
+`.github/workflows/deploy-pages.yml` tests, builds, and deploys the app on every push to `main`. It also supports manual runs from the Actions tab. In the repository's **Settings → Pages → Build and deployment**, select **GitHub Actions** as the source. Push `main` to trigger the first deployment.
+
+The site URL is https://daaaamiano.github.io/tg-app/. The workflow reads the Pages base path, so scripts, the favicon, the poster, and authentication redirects stay under `/tg-app/`. It creates `login/index.html` so the login initiation URL works without a server rewrite.
+
+For a local preview of the Pages build:
+
+```sh
+npm run build -- --base /tg-app/
+npm run preview -- --base /tg-app/
+```
+
+Open http://127.0.0.1:4173/tg-app/. The additional static login entry is created by the deployment workflow.
+
+Set any public build settings in **Settings → Secrets and variables → Actions → Variables** using the names from `.env.example`. The workflow supports `VITE_DATA_SOURCE`, `VITE_API_BASE_URL`, `VITE_TELEGRAM_BOT_USERNAME`, `VITE_WORKOS_CLIENT_ID`, `VITE_WORKOS_API_HOSTNAME`, and `VITE_WORKOS_DEV_MODE`. With no variables, the event site runs with local event data and web sign-in remains unconfigured. `.env.local` is not uploaded or used by GitHub Actions.
+
+To enable WorkOS on Pages, add these URLs in the matching WorkOS environment:
+
+| Setting | Pages value |
+| --- | --- |
+| CORS origin | `https://daaaamiano.github.io` |
+| Redirect URI / default redirect | `https://daaaamiano.github.io/tg-app/` |
+| Sign-out URI / default sign-out | `https://daaaamiano.github.io/tg-app/` |
+| Initiate login URI | `https://daaaamiano.github.io/tg-app/login/` |
+
+Use staging development mode or a production custom authentication domain as described above. Configure Telegram's Main Mini App URL separately in BotFather.
+
+### Other static hosts
+
+Build with `npm run build` (or pass `-- --base /YOUR_PATH/` for a subdirectory), then serve `dist/` over HTTPS. Serve the base path's `login` route with `index.html` for AuthKit's login initiation flow. Set the production environment's WorkOS origin/redirects and configure a custom authentication domain as described above. `VITE_` settings are public and are included at build time; never include secret keys or bot tokens.
