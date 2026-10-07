@@ -17,7 +17,7 @@ export const demoEvent: EventData = {
       address: "Carrer del Rector Triadó, 11",
       neighborhood: "Sants",
       city: "Barcelona",
-      poster: "/private-rope-jam-poster.jpg",
+      poster: `${import.meta.env.BASE_URL}private-rope-jam-poster.jpg`,
       suspensionPoints: 1,
       inviteOnly: true,
     },

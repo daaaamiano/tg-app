@@ -9,6 +9,7 @@ import {
 } from "react";
 import { getWebAuthConfig, toWebSession } from "../lib/authkit";
 import { isInTelegram } from "../lib/telegram";
+import { appHomeUrl, isLoginPath } from "../lib/paths";
 import type { AuthSession } from "../types/event";
 
 interface WebAccount {
@@ -53,11 +54,11 @@ function WebAccountBridge({ children }: { children: ReactNode }) {
 
   // WorkOS uses this route for invitation/password-reset links that need a fresh PKCE flow.
   useEffect(() => {
-    if (isLoading || window.location.pathname !== "/login" || initiated.current)
+    if (isLoading || !isLoginPath(window.location.pathname) || initiated.current)
       return;
     initiated.current = true;
     if (user) {
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState({}, "", import.meta.env.BASE_URL);
       return;
     }
     signIn().catch(() => setError("Could not open sign-in. Please try again."));
@@ -73,7 +74,7 @@ function WebAccountBridge({ children }: { children: ReactNode }) {
         signIn: () => signIn(),
         signUp: () => signUp(),
         signOut: async () => {
-          await signOut({ returnTo: `${window.location.origin}/` });
+          await signOut({ returnTo: appHomeUrl(window.location.origin) });
         },
         getAccessToken: () => getAccessToken(),
       }}
@@ -103,8 +104,8 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
       clientId={config.clientId}
       apiHostname={config.apiHostname}
       devMode={config.devMode}
-      redirectUri={`${window.location.origin}/`}
-      onRedirectCallback={() => window.history.replaceState({}, "", "/")}
+      redirectUri={appHomeUrl(window.location.origin)}
+      onRedirectCallback={() => window.history.replaceState({}, "", import.meta.env.BASE_URL)}
     >
       <WebAccountBridge>{children}</WebAccountBridge>
     </AuthKitProvider>
