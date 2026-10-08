@@ -1,9 +1,11 @@
 import { openTelegramLogin, type TelegramLoginChallenge } from "./lib/telegramLoginPopup";
+import { accessDeniedCopy } from "./lib/accessCopy";
 
 const signin = document.getElementById("signin") as HTMLButtonElement;
 const signout = document.getElementById("signout") as HTMLButtonElement;
 const status = document.getElementById("status")!;
 const description = document.getElementById("description")!;
+const heading = document.querySelector("h1")!;
 const main = document.querySelector("main")!;
 let challenge: TelegramLoginChallenge | null = null;
 let cancelPopup: (() => void) | undefined;
@@ -12,10 +14,19 @@ function setAuthenticating(authenticating: boolean) {
   main.classList.toggle("authenticating", authenticating);
   main.setAttribute("aria-busy", String(authenticating));
   signin.hidden = authenticating;
+  heading.innerHTML = "Your place<br>in the circle.";
   description.textContent = authenticating
     ? "Please wait while we check your Telegram account."
     : "Sign in with Telegram to continue.";
   if (authenticating) status.textContent = "Authenticating with Telegram…";
+}
+
+function showAccessDenied() {
+  setAuthenticating(false);
+  heading.textContent = accessDeniedCopy.title;
+  description.textContent = accessDeniedCopy.description;
+  status.textContent = accessDeniedCopy.help;
+  signin.textContent = "Use another Telegram account";
 }
 
 async function api(route: string, options: RequestInit = {}) {
@@ -35,9 +46,9 @@ async function prepare() {
     const current = await api("session");
     signout.hidden = !current.session;
     if (current.session?.canViewEvents) { location.reload(); return; }
-    if (current.session) status.textContent = "This account does not have access yet.";
+    if (current.session) showAccessDenied();
     challenge = await api("login-challenge", { method: "POST" });
-    signin.textContent = "Sign in with Telegram";
+    signin.textContent = current.session ? "Use another Telegram account" : "Sign in with Telegram";
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : "Sign-in could not be prepared.";
     signin.textContent = "Try again";
@@ -50,11 +61,9 @@ async function authenticate(proof: { idToken: string } | { initData: string }) {
   setAuthenticating(true);
   const result = await api("authenticate", { method: "POST", body: JSON.stringify(proof) });
   if (result.session.canViewEvents) { location.reload(); return; }
-  setAuthenticating(false);
-  status.textContent = "This account does not have access yet.";
+  showAccessDenied();
   signout.hidden = false;
   challenge = null;
-  signin.textContent = "Use another Telegram account";
   signin.disabled = false;
 }
 

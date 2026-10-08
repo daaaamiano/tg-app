@@ -42,6 +42,7 @@ import type { AuthSession, EventData, RopeEvent } from "./types/event";
 import { isLoginPath } from "./lib/paths";
 import { useOrganizationAccount } from "./lib/useOrganizationAccount";
 import { organizationAuthAvailable, privateServiceMode } from "./lib/organization";
+import { accessDeniedCopy } from "./lib/accessCopy";
 
 type View = "event" | "events" | "groups";
 
@@ -252,9 +253,10 @@ export default function App() {
       <header className="site-header"><span>private rope jam.</span></header>
       <main><section className="empty-state">
         <span className="eyebrow">PRIVATE ROPE JAM</span>
-        <h1>Your place in the circle.</h1>
+        <h1>{!organization.loading && organization.session ? accessDeniedCopy.title : "Your place in the circle."}</h1>
         {organization.loading ? <p role="status">Authenticating with Telegram…</p> : <>
-          <p>{organization.session ? "This account does not have access yet." : "Sign in with Telegram to continue."}</p>
+          <p>{organization.session ? accessDeniedCopy.description : "Sign in with Telegram to continue."}</p>
+          {organization.session && <p>{accessDeniedCopy.help}</p>}
           <TelegramBrowserLogin onAuthenticate={organization.authenticate} />
           {organization.session && <button className="text-link" onClick={() => void signOut()}>Sign out <ArrowRight size={14} /></button>}
           {authError && <p className="error-message" role="alert">{authError}</p>}
