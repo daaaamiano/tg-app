@@ -251,9 +251,9 @@ export default function App() {
     <div className="app-shell">
       <header className="site-header"><span>private rope jam.</span></header>
       <main><section className="empty-state">
-        {organization.loading ? <p role="status">Checking your access…</p> : <>
-          <span className="eyebrow">PRIVATE ROPE JAM</span>
-          <h1>Your place in the circle.</h1>
+        <span className="eyebrow">PRIVATE ROPE JAM</span>
+        <h1>Your place in the circle.</h1>
+        {organization.loading ? <p role="status">Authenticating with Telegram…</p> : <>
           <p>{organization.session ? "This account does not have access yet." : "Sign in with Telegram to continue."}</p>
           <TelegramBrowserLogin onAuthenticate={organization.authenticate} />
           {organization.session && <button className="text-link" onClick={() => void signOut()}>Sign out <ArrowRight size={14} /></button>}

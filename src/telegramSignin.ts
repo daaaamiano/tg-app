@@ -3,8 +3,20 @@ import { openTelegramLogin, type TelegramLoginChallenge } from "./lib/telegramLo
 const signin = document.getElementById("signin") as HTMLButtonElement;
 const signout = document.getElementById("signout") as HTMLButtonElement;
 const status = document.getElementById("status")!;
+const description = document.getElementById("description")!;
+const main = document.querySelector("main")!;
 let challenge: TelegramLoginChallenge | null = null;
 let cancelPopup: (() => void) | undefined;
+
+function setAuthenticating(authenticating: boolean) {
+  main.classList.toggle("authenticating", authenticating);
+  main.setAttribute("aria-busy", String(authenticating));
+  signin.hidden = authenticating;
+  description.textContent = authenticating
+    ? "Please wait while we check your Telegram account."
+    : "Sign in with Telegram to continue.";
+  if (authenticating) status.textContent = "Authenticating with Telegram…";
+}
 
 async function api(route: string, options: RequestInit = {}) {
   const response = await fetch("/api/telegram/" + route, {
@@ -16,6 +28,7 @@ async function api(route: string, options: RequestInit = {}) {
 }
 
 async function prepare() {
+  setAuthenticating(false);
   signin.disabled = true;
   signin.textContent = "Preparing Telegram sign-in…";
   try {
@@ -34,8 +47,10 @@ async function prepare() {
 }
 
 async function authenticate(proof: { idToken: string } | { initData: string }) {
+  setAuthenticating(true);
   const result = await api("authenticate", { method: "POST", body: JSON.stringify(proof) });
   if (result.session.canViewEvents) { location.reload(); return; }
+  setAuthenticating(false);
   status.textContent = "This account does not have access yet.";
   signout.hidden = false;
   challenge = null;
@@ -47,12 +62,13 @@ signin.onclick = () => {
   if (!challenge) { void prepare(); return; }
   cancelPopup?.();
   signin.disabled = true;
-  status.textContent = "Verifying Telegram…";
+  setAuthenticating(true);
   cancelPopup = openTelegramLogin(challenge, async (result) => {
     try {
       if (!result.id_token) throw new Error(result.error || "Telegram sign-in could not complete. Please try again.");
       await authenticate({ idToken: result.id_token });
     } catch (error) {
+      setAuthenticating(false);
       status.textContent = error instanceof Error ? error.message : "Telegram sign-in failed.";
       challenge = null;
       signin.textContent = "Try again";
@@ -68,9 +84,8 @@ signout.onclick = async () => {
 const initData = window.Telegram?.WebApp?.initData;
 if (initData) {
   window.Telegram!.WebApp!.ready();
-  status.textContent = "Verifying Telegram…";
   void authenticate({ initData }).catch((error) => {
     status.textContent = error instanceof Error ? error.message : "Telegram sign-in failed.";
     void prepare();
   });
-} else { void prepare(); }
+} else { status.textContent = ""; void prepare(); }
