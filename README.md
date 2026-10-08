@@ -265,7 +265,9 @@ Before implementation, choose current membership versus a fixed snapshot/subset,
 
 The old URL https://daaaamiano.github.io/tg-app/ forwards visitors to Vercel. The Pages artifact contains only `index.html` and `404.html`; it never includes event bundles, posters, credentials, or the private server. URL fragments such as `#organization` are preserved by the JavaScript redirect. Generate this artifact locally with `node scripts/build-pages-redirect.mjs`.
 
-Vercel deployments currently use the CLI. A push to GitHub does not deploy Vercel until the project's GitHub integration is connected.
+`vercel.json` enables automatic Git deployments only for `main`. Each deployment runs the tests before building the private Vercel function; a failed test or build stops deployment. The existing GitHub Pages workflow continues publishing the public redirect.
+
+To activate automatic deployment, connect **daaaamiano/tg-app** to the existing **damianoshibari-8924/ropelab** project in **Vercel → Project Settings → Git**, then set **Project Settings → Environments → Production → Branch Tracking** to `main`. Until that connection is completed, deployment still requires the CLI. Once connected, every new push to `main` builds and deploys production at https://ropelab.vercel.app. The function-only build keeps event assets behind Telegram authorization.
 
 ### Other static hosts
 
