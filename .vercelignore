@@ -8,5 +8,3 @@ node_modules
 dist
 dist-server
 README.md
-server/*.test.ts
-src/**/*.test.ts
