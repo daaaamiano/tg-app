@@ -16,6 +16,11 @@ interface TelegramWebApp {
 }
 declare global {
   interface Window {
-    Telegram?: { WebApp?: TelegramWebApp };
+    Telegram?: {
+      WebApp?: TelegramWebApp;
+      Login?: {
+        auth(options: { client_id: number; scope: string[]; nonce: string }, callback: (result: { id_token?: string; error?: string }) => void): void;
+      };
+    };
   }
 }

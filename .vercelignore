@@ -1,0 +1,12 @@
+.env
+.env.*
+.codex
+.agents
+.git
+coverage
+node_modules
+dist
+dist-server
+README.md
+server/*.test.ts
+src/**/*.test.ts

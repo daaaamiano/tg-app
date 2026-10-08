@@ -1,7 +1,17 @@
 node_modules/
 dist/
+dist-server/
+.vercel/
 .env
 .env.local
 .env.*.local
 .DS_Store
 coverage/
+dist-pages/
+.agents/
+skills-lock.json
+.vercel
+.env*
+
+!.env.server.example
+!.env.service.example

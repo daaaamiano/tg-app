@@ -12,6 +12,8 @@ import {
   X,
 } from "lucide-react";
 import { Modal } from "./components/Modal";
+import { GroupApprovals } from "./components/GroupApprovals";
+import { TelegramBrowserLogin } from "./components/TelegramBrowserLogin";
 import { RopeParallax } from "./components/RopeParallax";
 import { useWebAccount } from "./components/AppAuthProvider";
 import { houseRules } from "./data/event";
@@ -38,8 +40,10 @@ import {
 } from "./lib/telegram";
 import type { AuthSession, EventData, RopeEvent } from "./types/event";
 import { isLoginPath } from "./lib/paths";
+import { useOrganizationAccount } from "./lib/useOrganizationAccount";
+import { organizationAuthAvailable, privateServiceMode } from "./lib/organization";
 
-type View = "event" | "events";
+type View = "event" | "events" | "groups";
 
 function RopeMark() {
   return (
@@ -67,7 +71,7 @@ function RopeMark() {
 export default function App() {
   const [data, setData] = useState<EventData | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [view, setView] = useState<View>("event");
+  const [view, setView] = useState<View>(() => window.location.hash === "#organization" ? "groups" : window.location.hash === "#events" ? "events" : "event");
   const [period, setPeriod] = useState<EventPeriod>("upcoming");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAccount, setShowAccount] = useState(
@@ -80,7 +84,12 @@ export default function App() {
   const [jumpToRules, setJumpToRules] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const webAccount = useWebAccount();
-  const auth = webAccount.session ?? localAuth;
+  const organization = useOrganizationAccount();
+  const auth: AuthSession | null = organization.session
+    ? { user: organization.session.user, mode: "verified" }
+    : webAccount.session ?? localAuth;
+  const isSystemAdmin = organization.session?.isSystemAdmin === true;
+  const canViewEvents = isSystemAdmin || organization.session?.canViewEvents === true;
   const inTelegram = isInTelegram();
   const allEvents = data?.events ?? [];
   const visibleEvents = filterEvents(allEvents, period, now);
@@ -102,7 +111,15 @@ export default function App() {
         )
       );
   }
-  useEffect(load, []);
+  useEffect(() => {
+    if (privateServiceMode && !canViewEvents) { setData(null); return; }
+    load();
+  }, [canViewEvents]);
+  useEffect(() => {
+    const changeView = () => setView(window.location.hash === "#organization" ? "groups" : window.location.hash === "#events" ? "events" : "event");
+    window.addEventListener("hashchange", changeView);
+    return () => window.removeEventListener("hashchange", changeView);
+  }, []);
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(interval);
@@ -122,6 +139,7 @@ export default function App() {
 
   function navigate(next: View) {
     setView(next);
+    window.location.hash = next === "groups" ? "organization" : next === "events" ? "events" : "";
     setJumpToRules(false);
     haptic();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -167,7 +185,9 @@ export default function App() {
     setAuthBusy(true);
     setAuthError("");
     try {
-      if (apiConfigured) {
+      if (organizationAuthAvailable) {
+        await organization.authenticate({ initData: telegram.initData });
+      } else if (apiConfigured) {
         const response = await authenticateTelegram(telegram.initData);
         setLocalAuth({ user: response.user, mode: "verified" });
       } else {
@@ -180,7 +200,7 @@ export default function App() {
       }
       setShowAccount(false);
       setNotice(
-        apiConfigured
+        apiConfigured || organizationAuthAvailable
           ? "Signed in with Telegram"
           : "Telegram profile connected in preview mode"
       );
@@ -196,6 +216,14 @@ export default function App() {
     setAuthBusy(true);
     setAuthError("");
     try {
+      if (organization.session) {
+        await organization.signOut();
+        setLocalAuth(null);
+        setShowAccount(false);
+        navigate("event");
+        setNotice("Signed out of Telegram");
+        return;
+      }
       if (auth?.mode === "authkit") {
         await webAccount.signOut();
         return;
@@ -217,6 +245,23 @@ export default function App() {
     haptic();
     setNotice("Calendar file downloaded. Open it to add the jam.");
   }
+
+  // Clear the private UI after session expiry/logout even when the JS is already loaded.
+  if (privateServiceMode && !canViewEvents) return (
+    <div className="app-shell">
+      <header className="site-header"><span>private rope jam.</span></header>
+      <main><section className="empty-state">
+        {organization.loading ? <p role="status">Checking your access…</p> : <>
+          <span className="eyebrow">PRIVATE ROPE JAM</span>
+          <h1>Your place in the circle.</h1>
+          <p>{organization.session ? "This account does not have access yet." : "Sign in with Telegram to continue."}</p>
+          <TelegramBrowserLogin onAuthenticate={organization.authenticate} />
+          {organization.session && <button className="text-link" onClick={() => void signOut()}>Sign out <ArrowRight size={14} /></button>}
+          {authError && <p className="error-message" role="alert">{authError}</p>}
+        </>}
+      </section></main>
+    </div>
+  );
 
   return (
     <div className="app-shell">
@@ -253,12 +298,17 @@ export default function App() {
           </button>
           <button
             onClick={() => {
-              setView("event");
+              navigate("event");
               setJumpToRules(true);
             }}
           >
             House rules <ArrowDown size={12} />
           </button>
+          {isSystemAdmin && (
+            <a className={view === "groups" ? "active" : ""} href="#organization" aria-current={view === "groups" ? "page" : undefined}>
+              Organization
+            </a>
+          )}
         </nav>
         <button
           className={`account-button ${auth ? "connected" : ""}`}
@@ -283,7 +333,21 @@ export default function App() {
       </header>
 
       <main>
-        {loadError ? (
+        {view === "groups" ? (
+          organization.loading ? (
+            <section className="empty-state" role="status"><p>Checking organization access…</p></section>
+          ) : isSystemAdmin ? (
+            <GroupApprovals onBack={() => navigate("event")} onSessionInvalid={() => void organization.refresh()} />
+          ) : (
+            <section className="empty-state">
+              <span className="eyebrow">ADMIN ACCESS</span>
+              <h1>Administrator sign-in required.</h1>
+              <p>{organization.session ? "This Telegram account does not have organization access." : "Sign in with the administrator’s Telegram account to manage the organization."}</p>
+              {!organization.session && <button className="primary-button" onClick={openAccount}>Sign in <ArrowRight size={16} /></button>}
+              <button className="text-link" onClick={() => navigate("event")}>Back to the event <ArrowRight size={16} /></button>
+            </section>
+          )
+        ) : loadError ? (
           <section className="empty-state error-state">
             <span className="eyebrow">LET’S TRY AGAIN</span>
             <h1>A loose end.</h1>
@@ -503,6 +567,7 @@ export default function App() {
                   <a className="text-link" href="#practical">
                     The practical bits <ArrowDown size={15} />
                   </a>
+                  {isSystemAdmin && <a className="text-link" href="#organization">Organization <ArrowUpRight size={15} /></a>}
                 </div>
                 <div className="private-note">
                   <span className="tiny-line" />
@@ -633,6 +698,7 @@ export default function App() {
           PRIVATE ROPE JAM <span className="small-dot">·</span> BARCELONA
         </span>
         <span>A little rope. A lot of respect.</span>
+        {isSystemAdmin && <a className="text-link" href="#organization">Organization <ArrowUpRight size={12} /></a>}
         <button onClick={openAccount}>
           {auth ? "Your account" : "Sign in"}
           <ArrowUpRight size={12} />
@@ -653,7 +719,7 @@ export default function App() {
         </button>
         <button
           onClick={() => {
-            setView("event");
+            navigate("event");
             setJumpToRules(true);
           }}
         >
@@ -692,6 +758,15 @@ export default function App() {
                   : "You’re browsing with a demo profile."}{" "}
                 Attendance is confirmed by the host.
               </p>
+              {isSystemAdmin && <p className="login-note">System administrator</p>}
+              {!organization.session && organizationAuthAvailable && (
+                <div className="organizer-tools">
+                  <p className="login-note">Connect Telegram to check organization access.</p>
+                  <TelegramBrowserLogin onAuthenticate={async (proof) => {
+                    await organization.authenticate(proof); setShowAccount(false); setNotice("Signed in with Telegram");
+                  }} />
+                </div>
+              )}
               <dl className="account-details">
                 <div>
                   <dt>Name</dt>
@@ -771,7 +846,11 @@ export default function App() {
                   </div>
                 </>
               )}
-              <button
+              {!inTelegram && organizationAuthAvailable ? (
+                <TelegramBrowserLogin onAuthenticate={async (proof) => {
+                  await organization.authenticate(proof); setShowAccount(false); setNotice("Signed in with Telegram");
+                }} />
+              ) : <button
                 className="outline-button full-width"
                 disabled={authBusy || webAccount.isLoading}
                 onClick={signInTelegram}
@@ -781,8 +860,8 @@ export default function App() {
                   ? "Connecting…"
                   : "Continue with Telegram"}
                 <ArrowUpRight size={16} />
-              </button>
-              {inTelegram && !apiConfigured && (
+              </button>}
+              {inTelegram && !apiConfigured && !organizationAuthAvailable && (
                 <p className="login-note">
                   Profile preview only. Telegram verification will be connected
                   with the event backend.
@@ -810,6 +889,20 @@ export default function App() {
             <p className="error-message" role="alert">
               {authError}
             </p>
+          )}
+          {isSystemAdmin && (
+            <div className="organizer-tools">
+              <span className="eyebrow">ORGANIZATION</span>
+              <button
+                className="outline-button full-width"
+                onClick={() => {
+                  setShowAccount(false);
+                  navigate("groups");
+                }}
+              >
+                Manage organization <ArrowRight size={16} />
+              </button>
+            </div>
           )}
         </Modal>
       )}

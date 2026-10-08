@@ -1,4 +1,4 @@
-name: Deploy main to GitHub Pages
+name: Redirect GitHub Pages to the private app
 
 on:
   push:
@@ -30,23 +30,14 @@ jobs:
         run: npm ci
       - name: Test
         run: npm test
-      - name: Build
-        run: npm run build -- --base "${{ steps.pages.outputs.base_path }}/"
-        env:
-          VITE_DATA_SOURCE: ${{ vars.VITE_DATA_SOURCE || 'mock' }}
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_TELEGRAM_BOT_USERNAME: ${{ vars.VITE_TELEGRAM_BOT_USERNAME }}
-          VITE_WORKOS_CLIENT_ID: ${{ vars.VITE_WORKOS_CLIENT_ID }}
-          VITE_WORKOS_API_HOSTNAME: ${{ vars.VITE_WORKOS_API_HOSTNAME }}
-          VITE_WORKOS_DEV_MODE: ${{ vars.VITE_WORKOS_DEV_MODE || 'false' }}
-      - name: Add static login entry
-        run: |
-          mkdir -p dist/login
-          cp dist/index.html dist/login/index.html
+      - name: Build private service
+        run: npm run build:vercel
+      - name: Build public redirect
+        run: node scripts/build-pages-redirect.mjs
       - name: Upload site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
-          path: dist
+          path: dist-pages
 
   deploy:
     if: github.ref == 'refs/heads/main'

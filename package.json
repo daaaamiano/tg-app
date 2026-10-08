@@ -7,7 +7,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:service": "tsc --noEmit -p tsconfig.server.json && node scripts/build-private-service.mjs",
+    "start": "node dist-server/index.mjs",
+    "build:vercel": "tsc --noEmit -p tsconfig.server.json && node scripts/build-vercel.mjs",
+    "verify:vercel": "node scripts/verify-vercel.mjs",
+    "db:setup": "node scripts/setup-database.mjs",
+    "test:db": "node scripts/test-postgres.mjs"
   },
   "keywords": [],
   "author": "",
@@ -15,10 +21,14 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@workos-inc/authkit-react": "0.16.3",
+    "express": "^5.2.1",
+    "jose": "^6.2.12",
     "lucide-react": "1.23.0",
+    "pg": "^8.23.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "@workos-inc/authkit-react": "0.16.3"
+    "teleproto": "^1.229.2"
   },
   "overrides": {
     "esbuild@^0.25.0": "0.25.10",
@@ -28,14 +38,20 @@
     }
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.4",
+    "@types/pg": "^8.23.1",
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
+    "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "5.0.4",
+    "esbuild": "0.25.10",
+    "supertest": "^7.3.1",
     "typescript": "5.9.3",
     "vite": "7.1.9",
     "vitest": "1.6.1"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": "22.x"
   }
 }
