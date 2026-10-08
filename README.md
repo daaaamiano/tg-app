@@ -169,6 +169,8 @@ The backend stores discovered groups by numeric chat ID and their approval state
 
 The bot may remain a regular group member. Access is granted only when `getChatMember` returns a current-member result for the verified person; any unavailable lookup fails closed. Administrator rights are recommended for reliable checks, since Telegram only guarantees lookups of other users for administrators, but the current Test lookup succeeds without them. Approval requires the bot to belong to the group, and revocation remains available during Telegram outages. Discovery never approves a group automatically.
 
+When a refresh, approval attempt, or attendee access check confirms that the bot has left or been kicked out, the backend removes the group and its saved approval. Explicit Telegram errors stating that the bot was kicked or is no longer a group member also trigger removal. Temporary lookup failures preserve saved groups for review and revocation. Adding the bot back allows discovery again, with approval required anew.
+
 ### Implementation checklist
 
 Work on `codex/telegram-event-access`. Start with step 1; mark configuration complete only after verifying it.

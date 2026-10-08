@@ -1,11 +1,11 @@
 import pg from "pg";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { createDatabaseGroupStore, createGroupAccess, createMemoryGroupStore, GroupAccessError } from "./groupAccess";
 
 const botId = 123456789;
 const config = { token: "123456789:test-secret-only", chatId: "-123", loginClientId: "123456789" };
 function fixture() {
-  const state = { admin: true, botPresent: true, status: "member", isMember: true, unavailable: false, webhook: "" };
+  const state = { admin: true, botPresent: true, botStatus: "", status: "member", isMember: true, unavailable: false, webhook: "" };
   const api = vi.fn(async <T>(method: string, body?: object): Promise<T> => {
     if (state.unavailable) throw new GroupAccessError();
     const args = body as { user_id?: number; chat_id?: string };
@@ -13,7 +13,7 @@ function fixture() {
       : method === "getWebhookInfo" ? { url: state.webhook }
       : method === "getUpdates" ? [{ my_chat_member: { chat: { id: -456, type: "supergroup" } } }]
       : method === "getChat" ? { id: Number(args.chat_id), title: "Test group", type: "supergroup" }
-      : args.user_id === botId ? { status: !state.botPresent ? "left" : state.admin ? "administrator" : "member", user: { id: botId, first_name: "Bot", is_bot: true } }
+      : args.user_id === botId ? { status: state.botStatus || (!state.botPresent ? "left" : state.admin ? "administrator" : "member"), user: { id: botId, first_name: "Bot", is_bot: true } }
       : { status: state.status, is_member: state.isMember, user: { id: args.user_id, first_name: "Person", is_bot: false } };
     return result as T;
   });
@@ -21,6 +21,8 @@ function fixture() {
   const groups = createGroupAccess(store, () => config, api);
   return { state, api, store, groups };
 }
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("server-owned Telegram group access", () => {
   it("discovers group titles without acknowledging updates, preserves approvals on refresh and leaves webhooks alone", async () => {
@@ -53,8 +55,70 @@ describe("server-owned Telegram group access", () => {
     expect(await groups.canViewEvents(234)).toBe(true);
     await groups.setApproval("-456", true, 17666600);
     state.botPresent = false;
-    expect(await groups.canViewEvents(234)).toBe(false);
     await expect(groups.setApproval("-456", true, 17666600)).rejects.toMatchObject({ status: 409 });
+    expect(await groups.hasGroup("-456")).toBe(false);
+    expect(await groups.canViewEvents(234)).toBe(false);
+    expect(await groups.hasGroup("-123")).toBe(false);
+  });
+
+  it.each(["left", "kicked"])("removes %s groups and their approvals before metadata lookup, then requires approval after rejoining", async (status) => {
+    const { groups, state, api, store } = fixture();
+    await groups.list();
+    await groups.setApproval("-123", true, 17666600);
+    state.botStatus = status;
+    api.mockClear();
+    expect(await groups.list()).toEqual([]);
+    expect(await store.list()).toEqual([]);
+    expect(api.mock.calls.some(([method]) => method === "getChat")).toBe(false);
+    // The configured ID and unacknowledged discovery update must not restore departed groups.
+    expect(await groups.list()).toEqual([]);
+    state.botStatus = "member";
+    expect(await groups.list()).toHaveLength(2);
+    expect((await store.list()).every(group => !group.approved)).toBe(true);
+    expect(await groups.canViewEvents(234)).toBe(false);
+  });
+
+  it("keeps approvals when the bot identity or membership status is uncertain", async () => {
+    const { groups, state, store, api } = fixture();
+    await groups.list();
+    await groups.setApproval("-123", true, 17666600);
+    state.botStatus = "unknown";
+    expect(await groups.list()).toHaveLength(2);
+    const mismatchedApi = async <T>(method: string, body?: object): Promise<T> => {
+      if (method === "getChatMember") return { status: "kicked", user: { id: botId + 1, is_bot: true } } as T;
+      return api<T>(method, body);
+    };
+    expect(await createGroupAccess(store, () => config, mismatchedApi).list()).toHaveLength(2);
+    expect((await store.list()).find(group => group.chatId === "-123")?.approved).toBe(true);
+  });
+
+  it.each([
+    ["getChat", 403, "Forbidden: bot was kicked from the supergroup chat", true],
+    ["getChatMember", 403, "Forbidden: bot was kicked from the group chat", true],
+    ["getChatMember", 403, "Forbidden: bot is not a member of the supergroup chat", true],
+    ["getChatMember", 403, "Forbidden: bot is not a member of the group chat", true],
+    ["getChat", 400, "Bad Request: chat not found", false],
+    ["getChatMember", 403, "Forbidden: not enough rights", false],
+    ["getChatMember", 429, "Too Many Requests: retry after 30", false],
+    ["getChatMember", 500, "Internal Server Error", false],
+  ])("handles %s error %s (%s) without confusing removal with lookup failures", async (failedMethod, code, description, removed) => {
+    const { api, store } = fixture();
+    await store.discover("-123", "Saved group");
+    await store.setApproval("-123", true, 17666600);
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const method = url.split("/").at(-1)!;
+      const body = JSON.parse(init.body as string) as { chat_id?: string };
+      const data = method === failedMethod && body.chat_id === "-123"
+        ? { ok: false, error_code: code, description }
+        : { ok: true, result: await api(method, body) };
+      return { json: async () => data };
+    }));
+    const groups = createGroupAccess(store, () => config);
+    const result = await groups.list();
+    expect(await groups.hasGroup("-123")).toBe(!removed);
+    const saved = result.find(group => group.chatId === "-123");
+    if (removed) expect(saved).toBeUndefined();
+    else expect(saved).toMatchObject({ approved: true, botIsMember: false, verificationError: expect.any(String) });
   });
 
   it("fails closed on Telegram errors but still lists stored groups and permits revocation", async () => {
@@ -108,5 +172,9 @@ afterAll(async () => { await pool?.end(); });
     expect((await first.list()).find(group => group.chatId === id)?.approved).toBe(false);
     const audit = await query("SELECT updated_by::text FROM approved_groups WHERE chat_id=$1", [id]);
     expect(audit.rows[0].updated_by).toBe("17666600");
+    await second.remove(id);
+    expect((await first.list()).some(group => group.chatId === id)).toBe(false);
+    await first.discover(id, "Rejoined test group");
+    expect((await second.list()).find(group => group.chatId === id)?.approved).toBe(false);
   } finally { await query("DELETE FROM approved_groups WHERE chat_id=$1", [id]); }
 });
