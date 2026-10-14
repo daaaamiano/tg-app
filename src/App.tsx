@@ -339,7 +339,7 @@ export default function App() {
           organization.loading ? (
             <section className="empty-state" role="status"><p>Checking organization access…</p></section>
           ) : isSystemAdmin ? (
-            <GroupApprovals onBack={() => navigate("event")} onSessionInvalid={() => void organization.refresh()} />
+            <GroupApprovals adminUserId={String(organization.session!.user.id)} onBack={() => navigate("event")} onSessionInvalid={() => void organization.refresh()} />
           ) : (
             <section className="empty-state">
               <span className="eyebrow">ADMIN ACCESS</span>

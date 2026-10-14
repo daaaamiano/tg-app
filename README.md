@@ -117,7 +117,9 @@ API requests include credentials. Configure exact CORS origins, suitable secure 
 
 ### Manage individual users in admin
 
-In **Organization → Individual users**, enter a numeric Telegram user ID and an optional name, then choose **Add user** or **Remove access**. Added users can view events after verified Telegram sign-in even without an approved group. Removed users are denied access even when they belong to an approved group. The list supports search, re-adding users, and **Use group rules**, which clears the individual decision and returns the user to the group membership policy. The system administrator always retains access.
+In **Organization → View members**, choose **Remove access** beside a person to block their event access, including access through other approved groups. Removed members stay visible in the roster with **Restore access** so you can add them back. Bots and the system administrator have no removal control. These decisions change event access, not Telegram group membership.
+
+For someone outside the group roster, open the compact **Add user by Telegram ID** form. Added users can view events after verified Telegram sign-in even without an approved group. The system administrator always retains access.
 
 Decisions are saved in the existing PostgreSQL database's `user_access` table. Before deploying this version, run `npm run db:setup` with the existing private database connection to apply the additive schema update. Local Vite development uses memory, so its decisions reset on restart. Individual decisions are checked for sessions, sign-in, and every private asset request; removal takes effect on subsequent requests from existing sessions. Already downloaded content cannot be recalled.
 

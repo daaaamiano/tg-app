@@ -875,10 +875,11 @@ em {
 }
 .user-access {
   margin-top: 28px;
-  padding: 24px;
+  padding: 16px;
   border: 1px solid var(--line);
 }
-.user-access h2 { font-size: 21px; }
+.user-access summary { cursor: pointer; font-size: 12px; }
+.user-access summary svg { vertical-align: middle; margin: 0 6px; }
 .user-access-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -897,22 +898,12 @@ em {
 }
 .user-access-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .user-access-form > .user-access-actions { grid-column: 1 / -1; }
-.user-access-list { list-style: none; padding: 0; margin: 16px 0; }
-.user-access-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
-}
-.user-access-row > div:first-child { flex: 1; min-width: 130px; overflow-wrap: anywhere; }
 @media (max-width: 620px) {
-  .user-access { padding: 16px; }
   .user-access-form { grid-template-columns: 1fr; }
-  .user-access > .group-members-heading { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
-  .user-access-row > .user-access-actions { width: 100%; }
 }
+.member-access { width: 140px; }
+.member-access-status { display: block; color: var(--muted); font-size: 10px; margin-bottom: 9px; }
+.member-access button { white-space: nowrap; font-size: 11px; }
 .groups-heading {
   display: flex;
   align-items: flex-end;

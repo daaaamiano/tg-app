@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
 import { GroupMembers } from "./GroupMembers";
 import { UserAccess } from "./UserAccess";
-import { organizationRequest, privateServiceMode } from "../lib/organization";
+import { organizationRequest } from "../lib/organization";
 import type { AuthorizedGroup } from "../types/group";
 
-export function GroupApprovals({ onBack, onSessionInvalid }: { onBack: () => void; onSessionInvalid: () => void }) {
+export function GroupApprovals({ onBack, onSessionInvalid, adminUserId }: { onBack: () => void; onSessionInvalid: () => void; adminUserId: string }) {
   const [allGroups, setAllGroups] = useState<AuthorizedGroup[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -14,6 +14,7 @@ export function GroupApprovals({ onBack, onSessionInvalid }: { onBack: () => voi
   const [message, setMessage] = useState("");
   const [filter, setFilter] = useState<"all" | "approved">("all");
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [userAccessVersion, setUserAccessVersion] = useState(0);
   const approvedCount = allGroups.filter(group => group.approved).length;
   const groups = allGroups.filter(group => filter === "all" || group.approved);
 
@@ -52,25 +53,12 @@ export function GroupApprovals({ onBack, onSessionInvalid }: { onBack: () => voi
         <div>
           <span className="eyebrow">SYSTEM ADMIN / ACCESS</span>
           <h1 id="groups-title">Your organization.</h1>
-          <p>Manage individual users and approve Telegram groups.</p>
+          <p>Approve groups, then open Members to manage individual access.</p>
         </div>
         <span className="group-count"><ShieldCheck size={17} /> {approvedCount} approved</span>
       </div>
 
-      <UserAccess onSessionInvalid={onSessionInvalid} />
-
-      <aside className="groups-preview-note" aria-label="Group access policy">
-        <span className="eyebrow">GROUP ACCESS</span>
-        <p>{privateServiceMode ? "Approvals are saved for your organization. Access is checked against current Telegram group membership." : "Local development approvals last for this server session."}</p>
-      </aside>
-
-      <div className="groups-policy">
-        <UsersRound size={23} />
-        <div>
-          <h2>One group approval. Everyone included.</h2>
-          <p>Members of any approved group can view the events after signing in with Telegram. Individual removals override group access; individually added users retain access when they leave a group.</p>
-        </div>
-      </div>
+      <UserAccess onSessionInvalid={onSessionInvalid} onAdded={() => setUserAccessVersion(version => version + 1)} />
 
       <div className="events-tabs" role="group" aria-label="Filter Telegram groups">
         <button className={filter === "all" ? "selected" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
@@ -103,7 +91,7 @@ export function GroupApprovals({ onBack, onSessionInvalid }: { onBack: () => voi
                   </span>
                 </div>
                 <p className="group-access-description">
-                  {approved ? group.botIsMember ? "Current members of this group can access your events." : "Approval is saved. Access is paused until the bot's group membership is verified." : "This group does not grant event access."}
+                  {approved ? group.botIsMember ? "Current members can access events unless individually removed." : "Approval is saved. Access is paused until the bot's group membership is verified." : "This group does not grant event access."}
                 </p>
                 {group.verificationError && <p className="error-message">{group.verificationError}</p>}
                 <div className="group-card-footer">
@@ -131,7 +119,7 @@ export function GroupApprovals({ onBack, onSessionInvalid }: { onBack: () => voi
                   <UsersRound size={15} /> {expandedGroup === group.chatId ? "Hide members" : "View members"}
                 </button>
                 {expandedGroup === group.chatId && (
-                  <div id={`members-${group.chatId}`}><GroupMembers chatId={group.chatId} onSessionInvalid={onSessionInvalid} /></div>
+                  <div id={`members-${group.chatId}`}><GroupMembers chatId={group.chatId} approved={group.approved} adminUserId={adminUserId} userAccessVersion={userAccessVersion} onSessionInvalid={onSessionInvalid} /></div>
                 )}
               </li>
             );
