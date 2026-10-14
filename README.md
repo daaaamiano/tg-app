@@ -115,6 +115,14 @@ API requests include credentials. Configure exact CORS origins, suitable secure 
 
 ## Restrict event visibility to approved Telegram users
 
+### Manage individual users in admin
+
+In **Organization → Individual users**, enter a numeric Telegram user ID and an optional name, then choose **Add user** or **Remove access**. Added users can view events after verified Telegram sign-in even without an approved group. Removed users are denied access even when they belong to an approved group. The list supports search, re-adding users, and **Use group rules**, which clears the individual decision and returns the user to the group membership policy. The system administrator always retains access.
+
+Decisions are saved in the existing PostgreSQL database's `user_access` table. Before deploying this version, run `npm run db:setup` with the existing private database connection to apply the additive schema update. Local Vite development uses memory, so its decisions reset on restart. Individual decisions are checked for sessions, sign-in, and every private asset request; removal takes effect on subsequent requests from existing sessions. Already downloaded content cannot be recalled.
+
+The admin-only endpoints are `GET /api/telegram/users` and `POST /api/telegram/user-access` with `{ "userId": "123456789", "name": "Optional label", "state": "allowed" | "blocked" | "group" }`. Mutations require the verified system administrator and the exact app origin. Labels do not establish identity or create Telegram accounts.
+
 **Status: the private app is live at https://ropelab.vercel.app with one PostgreSQL database for sessions and group approvals. Verified members of approved groups can access event files; only Telegram ID 17666600 can administer groups and see rosters. The main-branch GitHub Pages workflow now publishes only a redirect to the private app; the old public deployment is replaced when that workflow succeeds.** Work is on `codex/telegram-event-access`; hosting checks were completed on 8 October 2026.
 
 The sole system administrator is **Telegram user ID `17666600`**, defined in server-only `server/telegramAuth.ts`. After verified Telegram sign-in, the homepage navigation, event actions, footer, and account dialog provide an **Organization** link (`#organization`). Signed-out visitors, other Telegram IDs, WorkOS accounts without a verified Telegram connection, and demo/preview profiles never see this link or the organization screen. Direct navigation shows a generic admin sign-in/denied screen without group data.

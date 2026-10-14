@@ -29,3 +29,12 @@ CREATE TABLE IF NOT EXISTS approved_groups (
   updated_by bigint,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Individual decisions take precedence over approved Telegram groups.
+CREATE TABLE IF NOT EXISTS user_access (
+  user_id bigint PRIMARY KEY CHECK (user_id > 0 AND user_id <= 9007199254740991),
+  name text NOT NULL DEFAULT '' CHECK (length(name) <= 100),
+  state text NOT NULL CHECK (state IN ('allowed', 'blocked')),
+  updated_by bigint NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);

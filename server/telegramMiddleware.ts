@@ -6,6 +6,7 @@ import { SESSION_SECONDS, TelegramSessions, verifyBrowserToken, verifyMiniAppDat
 
 import { AuthStorageError, MemoryLoginState, type LoginState } from "./authStorage";
 import { createGroupAccess, createMemoryGroupStore, GroupAccessError, type GroupAccess } from "./groupAccess";
+import { canViewEvents, createMemoryUserAccessStore, type UserAccessStore } from "./userAccess";
 
 export function allowLocalRosterRequest({ remoteAddress, host, origin, fetchSite }: {
   remoteAddress?: string; host?: string; origin?: string; fetchSite?: string;
@@ -51,6 +52,7 @@ export interface TelegramMiddlewareOptions {
   loginState?: LoginState;
   rosterLoader?: typeof loadGroupRoster;
   groups?: GroupAccess;
+  users?: UserAccessStore;
 }
 
 export function createTelegramMiddleware(configReader: () => TelegramServerConfig, options: TelegramMiddlewareOptions) {
@@ -59,6 +61,7 @@ export function createTelegramMiddleware(configReader: () => TelegramServerConfi
   const sessions = options.sessions ?? new TelegramSessions();
   const loginState = options.loginState ?? new MemoryLoginState();
   const groups = options.groups ?? createGroupAccess(createMemoryGroupStore(), configReader);
+  const users = options.users ?? createMemoryUserAccessStore();
   const prefix = options.prefix;
   const sessionCookie = sessionCookieName(options.secureCookies === true);
   const challengeCookie = options.secureCookies ? "__Host-ropelab_telegram_challenge" : "ropelab_telegram_challenge";
@@ -79,7 +82,7 @@ export function createTelegramMiddleware(configReader: () => TelegramServerConfi
     if (!(options.localOnly ? allowLocalRosterRequest(boundary) : allowHostedRequest(boundary, options.origin!)))
       return send(403, { error: "Open Telegram administration from this app." });
     const origin = options.localOnly ? `http://${req.headers.host}` : options.origin!;
-    const method = ["authenticate", "logout", "login-challenge", "group-approval"].includes(route) ? "POST" : "GET";
+    const method = ["authenticate", "logout", "login-challenge", "group-approval", "user-access"].includes(route) ? "POST" : "GET";
     if (req.method !== method) { res.setHeader("Allow", method); return send(405, { error: `Use ${method} for this request.` }); }
     // All mutations require an explicit exact Origin, including login and logout.
     if (method === "POST" && req.headers.origin !== origin)
@@ -94,8 +97,8 @@ export function createTelegramMiddleware(configReader: () => TelegramServerConfi
       const token = cookieValue(req, sessionCookie);
       if (route === "session") {
         const session = await sessions.get(token);
-        const canViewEvents = session ? session.isSystemAdmin || await groups.canViewEvents(Number(session.user.id)) : false;
-        return send(200, { session: session && await sessions.get(token) ? { ...session, canViewEvents } : null });
+        const allowed = session ? session.isSystemAdmin || await canViewEvents(Number(session.user.id), groups, users) : false;
+        return send(200, { session: session && await sessions.get(token) ? { ...session, canViewEvents: allowed } : null });
       }
       if (route === "logout") {
         await sessions.revoke(token);
@@ -134,18 +137,32 @@ export function createTelegramMiddleware(configReader: () => TelegramServerConfi
           } else throw new Error("Missing Telegram proof.");
           await sessions.revoke(token);
           const created = await sessions.create(user);
-          const canViewEvents = created.session.isSystemAdmin || await groups.canViewEvents(Number(user.id));
+          const allowed = created.session.isSystemAdmin || await canViewEvents(Number(user.id), groups, users);
           res.setHeader("Set-Cookie", [setCookie(sessionCookie, created.token, SESSION_SECONDS), setCookie(challengeCookie, "", 0)]);
-          return send(200, { session: { ...created.session, canViewEvents } });
+          return send(200, { session: { ...created.session, canViewEvents: allowed } });
         } catch (error) {
           if (error instanceof AuthStorageError || error instanceof GroupAccessError) throw error;
           return send(401, { error: "Telegram sign-in could not be verified. Please sign in again." });
         }
       }
-      if (!["group-members", "groups", "group-approval"].includes(route)) return send(404, { error: "Unknown Telegram endpoint." });
+      if (!["group-members", "groups", "group-approval", "users", "user-access"].includes(route)) return send(404, { error: "Unknown Telegram endpoint." });
       const session = await sessions.get(token);
       if (!session) return send(401, { error: "Sign in with Telegram to view organization members." });
       if (!session.isSystemAdmin) return send(403, { error: "Only the system administrator can view organization members." });
+      if (route === "users") {
+        const rules = await users.list();
+        if (!(await sessions.get(token))?.isSystemAdmin) return send(401, { error: "Your admin session expired. Sign in again." });
+        return send(200, { users: rules });
+      }
+      if (route === "user-access") {
+        if (!req.headers["content-type"]?.startsWith("application/json")) return send(415, { error: "Use a JSON request." });
+        let body;
+        try { body = await readBody(req); } catch { return send(400, { error: "Choose a user and access state." }); }
+        if (typeof body.userId !== "string" || (body.name !== undefined && typeof body.name !== "string") ||
+            !["allowed", "blocked", "group"].includes(String(body.state))) return send(400, { error: "Choose a user and access state." });
+        await users.set(body.userId, (body.name as string | undefined) ?? "", body.state as "allowed" | "blocked" | "group", Number(session.user.id), async () => (await sessions.get(token))?.isSystemAdmin === true);
+        return send(200, { ok: true });
+      }
       if (route === "groups") {
         const known = await groups.list();
         if (!(await sessions.get(token))?.isSystemAdmin) return send(401, { error: "Your admin session expired. Sign in again." });

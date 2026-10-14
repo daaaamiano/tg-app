@@ -5,6 +5,7 @@ import { readTelegramConfig, serviceOrigin } from "./telegramConfig";
 import { createDatabaseAuthStorage } from "./authStorage";
 import { databaseFromEnv } from "./database";
 import { createDatabaseGroupStore, createGroupAccess } from "./groupAccess";
+import { createDatabaseUserAccessStore } from "./userAccess";
 
 let app: ReturnType<typeof createPrivateService> | undefined;
 
@@ -19,7 +20,8 @@ export default function handler(req: IncomingMessage, res: ServerResponse) {
       const storage = createDatabaseAuthStorage(database.query, origin);
       const config = readTelegramConfig(process.cwd(), true);
       const groups = createGroupAccess(createDatabaseGroupStore(database.query), () => config);
-      app = createPrivateService({ origin, dist, config, groups, secureCookies: true, ...storage });
+      const users = createDatabaseUserAccessStore(database.query);
+      app = createPrivateService({ origin, dist, config, groups, users, secureCookies: true, ...storage });
     }
     return app(req, res);
   } catch {

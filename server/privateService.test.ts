@@ -8,6 +8,7 @@ import { createPrivateService } from './privateService';
 import { AuthStorageError, createDatabaseAuthStorage } from './authStorage';
 import pg from 'pg';
 import type { GroupAccess } from './groupAccess';
+import { createMemoryUserAccessStore } from './userAccess';
 
 const origin = 'https://private.example';
 const token = '123456789:test-secret-only';
@@ -39,6 +40,42 @@ function setup(storage: Partial<Parameters<typeof createPrivateService>[0]> = {}
 }
 
 describe('hosted private service', () => {
+  it('allows only the admin to add and remove users, enforcing removal on existing sessions and private assets', async () => {
+    let groupMember = false;
+    const groups: GroupAccess = { list: async () => [], setApproval: async () => {}, hasGroup: async () => false, canViewEvents: async () => groupMember };
+    const users = createMemoryUserAccessStore();
+    const { app, get, login } = setup({ groups, users });
+    const admin = await login(17666600);
+    const attendee = await login(234);
+    const post = (cookie: string | undefined, value: object, requestOrigin = origin) => {
+      const req = request(app).post('/api/telegram/user-access').set('Host','private.example').set('Origin',requestOrigin);
+      return (cookie ? req.set('Cookie',cookie) : req).send(value);
+    };
+    const add = { userId: '234', name: 'Guest', state: 'allowed' };
+    expect((await get('/api/telegram/users')).status).toBe(401);
+    expect((await get('/api/telegram/users',attendee.cookie)).status).toBe(403);
+    expect((await post(undefined,add)).status).toBe(401);
+    expect((await post(attendee.cookie,add)).status).toBe(403);
+    expect((await post(admin.cookie,add,'https://attacker.example')).status).toBe(403);
+    expect((await get('/poster.jpg',attendee.cookie)).status).toBe(403);
+    expect((await post(admin.cookie,add)).status).toBe(200);
+    expect((await get('/api/telegram/users',admin.cookie)).body.users).toEqual([add]);
+    expect((await get('/api/telegram/session',attendee.cookie)).body.session.canViewEvents).toBe(true);
+    expect((await get('/poster.jpg',attendee.cookie)).status).toBe(200);
+    groupMember = true;
+    expect((await post(admin.cookie,{ ...add, state: 'blocked' })).status).toBe(200);
+    for (const path of ['/assets/event.js','/poster.jpg','/']) expect((await get(path,attendee.cookie)).status).toBe(403);
+    expect((await get('/api/telegram/session',attendee.cookie)).body.session.canViewEvents).toBe(false);
+    expect((await login(234)).response.body.session.canViewEvents).toBe(false);
+    expect((await post(admin.cookie,{ ...add, state: 'group' })).status).toBe(200);
+    expect((await get('/poster.jpg',attendee.cookie)).status).toBe(200);
+    expect((await post(admin.cookie,{ userId: '17666600', state: 'blocked' })).status).toBe(400);
+    for (const userId of ['0', '-1', '9007199254740992', '@person']) expect((await post(admin.cookie,{...add,userId})).status).toBe(400);
+    expect((await post(admin.cookie,{...add,state:'invalid'})).status).toBe(400);
+    expect((await request(app).post('/api/telegram/logout').set('Host','private.example').set('Origin',origin).set('Cookie',admin.cookie)).status).toBe(200);
+    expect((await post(admin.cookie,add)).status).toBe(401);
+  });
+
   it('admits authorized attendees to events while keeping group lists, approvals and rosters admin-only', async () => {
     let allowed = true;
     const groups: GroupAccess = { list: vi.fn().mockResolvedValue([]), setApproval: vi.fn(), hasGroup: vi.fn().mockResolvedValue(true), canViewEvents: vi.fn(async () => allowed) };

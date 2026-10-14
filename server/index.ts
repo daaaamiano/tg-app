@@ -4,6 +4,7 @@ import { createPrivateService, validatePrivateBuild } from "./privateService";
 import { databaseFromEnv } from "./database";
 import { createDatabaseAuthStorage } from "./authStorage";
 import { createDatabaseGroupStore, createGroupAccess } from "./groupAccess";
+import { createDatabaseUserAccessStore } from "./userAccess";
 
 const production = process.env.NODE_ENV === "production";
 const root = process.cwd();
@@ -16,7 +17,8 @@ const database = production || process.env.DATABASE_URL ? databaseFromEnv(proces
 const storage = database ? createDatabaseAuthStorage(database.query, origin) : {};
 const config = readTelegramConfig(root, production);
 const groups = database ? createGroupAccess(createDatabaseGroupStore(database.query), () => config) : undefined;
-const app = createPrivateService({ origin, dist, config, groups, secureCookies: origin.startsWith("https:"), ...storage });
+const users = database ? createDatabaseUserAccessStore(database.query) : undefined;
+const app = createPrivateService({ origin, dist, config, groups, users, secureCookies: origin.startsWith("https:"), ...storage });
 const server = app.listen(port, production ? "0.0.0.0" : "127.0.0.1", () => {
   console.log(`Private app listening on port ${port}; configured origin: ${origin}`);
 });

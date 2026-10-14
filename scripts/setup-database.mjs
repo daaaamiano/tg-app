@@ -8,6 +8,6 @@ if (!["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) url.searchParam
 const pool = new pg.Pool({ connectionString: url.toString(), connectionTimeoutMillis: 8000 });
 try {
   await pool.query(await readFile(new URL("../server/schema.sql", import.meta.url), "utf8"));
-  console.log("Single database initialized for sessions, login challenges, and group approvals.");
+  console.log("Single database initialized for sessions, login challenges, group approvals, and individual user access.");
 } catch { throw new Error("Database setup failed. Check the private connection URL and database permissions."); }
 finally { await pool.end(); }

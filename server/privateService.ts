@@ -8,6 +8,7 @@ import { allowHostedRequest, cookieValue, createTelegramMiddleware, sessionCooki
 import { loadGroupRoster } from "./telegramMembers";
 import { loginCss, loginPage } from "./loginPage";
 import { createGroupAccess, createMemoryGroupStore, GroupAccessError, type GroupAccess } from "./groupAccess";
+import { canViewEvents, createMemoryUserAccessStore, type UserAccessStore } from "./userAccess";
 
 export function validatePrivateBuild(dist: string) {
   let marker: unknown;
@@ -17,11 +18,12 @@ export function validatePrivateBuild(dist: string) {
     throw new Error("The frontend must be built for the private service.");
 }
 
-export function createPrivateService({ origin, dist, config, secureCookies, rosterLoader = loadGroupRoster, sessions = new TelegramSessions(), loginState, groups = createGroupAccess(createMemoryGroupStore(), () => config) }: {
+export function createPrivateService({ origin, dist, config, secureCookies, rosterLoader = loadGroupRoster, sessions = new TelegramSessions(), loginState, groups = createGroupAccess(createMemoryGroupStore(), () => config), users = createMemoryUserAccessStore() }: {
   origin: string; dist: string; config: TelegramServerConfig; secureCookies: boolean;
   rosterLoader?: typeof loadGroupRoster;
   sessions?: SessionStore; loginState?: LoginState;
   groups?: GroupAccess;
+  users?: UserAccessStore;
 }) {
   const app = express();
   app.disable("x-powered-by");
@@ -48,7 +50,7 @@ export function createPrivateService({ origin, dist, config, secureCookies, rost
 
   // APIs and file serving use the same session store; the server derives every role.
   app.use(createTelegramMiddleware(() => config, {
-    prefix: "/api/telegram/", localOnly: false, origin, secureCookies, sessions, loginState, rosterLoader, groups,
+    prefix: "/api/telegram/", localOnly: false, origin, secureCookies, sessions, loginState, rosterLoader, groups, users,
   }));
   app.use("/api", (_req, res) => { res.status(404).json({ error: "Unknown API endpoint." }); });
   app.get("/signin.css", (_req, res) => { res.type("css").send(loginCss); });
@@ -58,7 +60,7 @@ export function createPrivateService({ origin, dist, config, secureCookies, rost
   app.use(async (req, res, next) => {
     const session = await sessions.get(cookieValue(req, sessionCookieName(secureCookies)));
     if (session?.isSystemAdmin) return next();
-    if (session && await groups.canViewEvents(Number(session.user.id)) && await sessions.get(cookieValue(req, sessionCookieName(secureCookies)))) return next();
+    if (session && await canViewEvents(Number(session.user.id), groups, users) && await sessions.get(cookieValue(req, sessionCookieName(secureCookies)))) return next();
     if (["/", "/index.html", "/login", "/login/"].includes(req.path) && ["GET", "HEAD"].includes(req.method)) {
       res.status(session ? 403 : 200).type("html").send(loginPage); return;
     }

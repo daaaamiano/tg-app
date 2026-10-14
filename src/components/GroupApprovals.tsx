@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
 import { GroupMembers } from "./GroupMembers";
+import { UserAccess } from "./UserAccess";
 import { organizationRequest, privateServiceMode } from "../lib/organization";
 import type { AuthorizedGroup } from "../types/group";
 
@@ -49,12 +50,14 @@ export function GroupApprovals({ onBack, onSessionInvalid }: { onBack: () => voi
       </button>
       <div className="groups-heading">
         <div>
-          <span className="eyebrow">SYSTEM ADMIN / GROUP ACCESS</span>
+          <span className="eyebrow">SYSTEM ADMIN / ACCESS</span>
           <h1 id="groups-title">Your organization.</h1>
-          <p>Approve a Telegram group to include everyone who belongs to it.</p>
+          <p>Manage individual users and approve Telegram groups.</p>
         </div>
         <span className="group-count"><ShieldCheck size={17} /> {approvedCount} approved</span>
       </div>
+
+      <UserAccess onSessionInvalid={onSessionInvalid} />
 
       <aside className="groups-preview-note" aria-label="Group access policy">
         <span className="eyebrow">GROUP ACCESS</span>
@@ -65,7 +68,7 @@ export function GroupApprovals({ onBack, onSessionInvalid }: { onBack: () => voi
         <UsersRound size={23} />
         <div>
           <h2>One group approval. Everyone included.</h2>
-          <p>Members of any approved group can view the events after signing in with Telegram. New members are included; people who leave lose access unless they belong to another approved group.</p>
+          <p>Members of any approved group can view the events after signing in with Telegram. Individual removals override group access; individually added users retain access when they leave a group.</p>
         </div>
       </div>
 
