@@ -27,11 +27,11 @@ export const demoEvent: EventData = {
 export const houseRules = [
   {
     title: "Consent, always.",
-    text: "Ask before touching a body, rope, or someone’s gear. Consent is specific, ongoing, and can be withdrawn at any time. No pressure, no explanations owed.",
+    text: "Only a clear, affirmative, enthusiastic yes means yes. Ask before touching someone, their rope, or their gear. Agree on boundaries and stop signals before starting, and stop immediately when asked.",
   },
   {
-    title: "Your name. Your pronouns.",
-    text: "Respect names, pronouns, identities, and boundaries. Don’t assume someone’s gender, orientation, role, or who they want to tie with.",
+    title: "Respect each other.",
+    text: "Respect everyone’s beliefs and identities.",
   },
   {
     title: "Keep the room private.",
@@ -42,11 +42,7 @@ export const houseRules = [
     text: "No racism, sexism, homophobia, transphobia, ableism, body shaming, or harassment. If something feels wrong, tell the host.",
   },
   {
-    title: "Only yes means yes.",
-    text: "Agree on boundaries and stop signals before starting. Stop immediately when asked. Watching, taking a break, or choosing not to tie is always welcome.",
-  },
-  {
     title: "Be present. Share the space.",
-    text: "Adults 18+ only. No intoxication. Ask the host before using the suspension point, stay within your experience, and make room for others.",
+    text: "Adults 18+ only. No intoxication. Ask the host before using the suspension point, stay within your experience, and make room for others. We’re here to have a good time—help make it a good experience for everyone.",
   },
 ];

@@ -699,7 +699,7 @@ export default function App() {
         <span>
           PRIVATE ROPE JAM <span className="small-dot">·</span> BARCELONA
         </span>
-        <span>A little rope. A lot of respect.</span>
+        <span>Practice rope. Meet people. Have a good time.</span>
         {isSystemAdmin && <a className="text-link" href="#organization">Organization <ArrowUpRight size={12} /></a>}
         <button onClick={openAccount}>
           {auth ? "Your account" : "Sign in"}
