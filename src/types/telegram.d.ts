@@ -2,11 +2,12 @@ import type { Attendee } from "./event";
 
 interface TelegramWebApp {
   initData: string;
-  initDataUnsafe: { user?: Attendee };
+  initDataUnsafe: { user?: Attendee & { allows_write_to_pm?: boolean } };
   platform: string;
   ready(): void;
   expand(): void;
   isVersionAtLeast(version: string): boolean;
+  requestWriteAccess?(callback: (allowed: boolean) => void): void;
   setHeaderColor(color: string): void;
   setBackgroundColor(color: string): void;
   HapticFeedback?: {

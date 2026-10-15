@@ -113,7 +113,7 @@ export function GroupMembers({ chatId, approved, adminUserId, userAccessVersion,
             </div>
           ) : <p className="member-note">{query ? "No members match your search." : "No member identities are available yet."}</p>}
           <p className="member-note member-updated">Checked {new Date(roster.checkedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Refresh to check for changes.</p>
-          <p className="member-note">Removal blocks access to all events, including through other groups. Telegram group membership stays unchanged.</p>
+          <p className="member-note">Removal blocks all event invitations, including through other groups. Allowed access does not confirm attendance.</p>
         </>
       )}
     </section>

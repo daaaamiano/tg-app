@@ -91,7 +91,7 @@ export function GroupApprovals({ onBack, onSessionInvalid, adminUserId }: { onBa
                   </span>
                 </div>
                 <p className="group-access-description">
-                  {approved ? group.botIsMember ? "Current members can access events unless individually removed." : "Approval is saved. Access is paused until the bot's group membership is verified." : "This group does not grant event access."}
+                  {approved ? group.botIsMember ? "Members can receive invitations to events linked to this group, unless individually removed." : "Approval is saved. Access is paused until the bot's group membership is verified." : "This group does not grant event access."}
                 </p>
                 {group.verificationError && <p className="error-message">{group.verificationError}</p>}
                 <div className="group-card-footer">

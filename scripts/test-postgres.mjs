@@ -21,7 +21,7 @@ try {
   run("pg_ctl", ["-D", data, "-l", `${directory}/server.log`, "-o", `-h 127.0.0.1 -p ${port} -k ${directory}`, "-w", "start"]);
   started = true;
   const url = `postgresql://postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
-  const env = { ...process.env, DATABASE_URL: url, TEST_DATABASE_URL: url };
+  const env = { ...process.env, DATABASE_URL: url, DATABASE_URL_UNPOOLED: url, TEST_DATABASE_URL: url };
   run("npm", ["run", "db:setup"], { env, stdio: "inherit" });
   run("npm", ["test"], { env, stdio: "inherit" });
   run("npm", ["run", "verify:vercel"], { env, stdio: "inherit" });

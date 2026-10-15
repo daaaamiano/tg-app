@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+
 import { createHmac } from "node:crypto";
 import { cp, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -27,6 +28,7 @@ const origin = "https://private.example";
 const botToken = "123456789:test-secret-only";
 const require = createRequire(import.meta.url);
 const savedEnv = { ...process.env };
+const savedFetch = globalThis.fetch;
 try {
   await cp(artifact, `${directory}/first`, { recursive: true });
   await cp(artifact, `${directory}/second`, { recursive: true });
@@ -42,6 +44,18 @@ try {
   });
   delete process.env.TELEGRAM_API_ID;
   delete process.env.TELEGRAM_API_HASH;
+  // Only fake Telegram identities are used against the disposable test database.
+  globalThis.fetch = async (url, options) => {
+    assert(String(url).startsWith(`https://api.telegram.org/bot${botToken}/`));
+    const method = String(url).split("/").at(-1);
+    const args = JSON.parse(options?.body ?? "{}");
+    const result = method === "getMe" ? { id: 123456789 }
+      : method === "getWebhookInfo" ? { url: "https://example.test/hook" }
+      : method === "getChat" ? { id: -123, type: "supergroup", title: "Test event group" }
+      : { status: args.user_id === 123456789 ? "administrator" : args.user_id === 234 ? "member" : "left",
+        user: { id: args.user_id, is_bot: args.user_id === 123456789, first_name: "Test member" } };
+    return { json: async () => ({ ok: true, result }) };
+  };
   const get = (handler, path, cookie) => {
     const req = request(handler).get(path).set("Host", "private.example");
     return cookie ? req.set("Cookie", cookie) : req;
@@ -67,10 +81,43 @@ try {
   const authorized = await get(second, bundle, cookie);
   assert.equal(authorized.status, 200);
   assert.equal(authorized.headers["cache-control"], "private, no-store");
+  for (const detail of ["LabCultural", "Rector Triadó", "2026-10-16T19:00:00"])
+    assert(!authorized.text.includes(detail), "Private event content must be fetched after event authorization.");
+  const post = (handler, route, sessionCookie, body) => request(handler).post(`/api/telegram/${route}`).set("Host", "private.example").set("Origin", origin).set("Cookie", sessionCookie).send(body);
+  assert.equal((await get(first, "/api/telegram/groups", cookie)).status, 200);
+  assert.equal((await post(first, "group-approval", cookie, { chatId: "-123", approved: true })).status, 200);
+  const memberFields = { auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify({ id: 234, first_name: "Test member" }) };
+  const memberCheck = Object.entries(memberFields).map(([k, v]) => `${k}=${v}`).join("\n");
+  const memberProof = new URLSearchParams({ ...memberFields, hash: createHmac("sha256", hmacKey).update(memberCheck).digest("hex") }).toString();
+  const memberLogin = await request(first).post("/api/telegram/authenticate").set("Host", "private.example").set("Origin", origin).send({ initData: memberProof });
+  assert.equal(memberLogin.status, 200);
+  const memberCookie = memberLogin.headers["set-cookie"][0].split(";")[0];
+  const invitations = await get(second, "/api/telegram/events", memberCookie);
+  assert.equal(invitations.status, 200);
+  assert.equal(invitations.body.events.length, 1);
+  const eventId = invitations.body.events[0].id;
+  const attendancePath = `/api/telegram/attendance?eventId=${encodeURIComponent(eventId)}`;
+  const initialAttendance = (await get(first, attendancePath, memberCookie)).body;
+  const houseRulesVersion = initialAttendance.rules.version;
+  const acceptedRuleIds = ["consent", "respect", "privacy", "non-discrimination", "shared-space"];
+  assert.equal(initialAttendance.response, "pending");
+  assert.equal(initialAttendance.rules.accepted, false);
+  assert.equal((await post(second, "rsvp", memberCookie, { eventId, response: "going" })).status, 428);
+  assert.equal((await post(second, "rsvp", memberCookie, { eventId, response: "going", rulesVersion: houseRulesVersion, acceptedRuleIds })).status, 200);
+  assert.equal((await get(first, attendancePath, memberCookie)).body.rules.accepted, true);
+  const going = await get(first, attendancePath, memberCookie);
+  assert.equal(going.body.response, "going");
+  assert.equal(going.body.people.length, 1);
+  assert.equal((await post(first, "rsvp", memberCookie, { eventId, response: "not-going" })).status, 200);
+  assert.equal((await get(second, attendancePath, memberCookie)).body.people.length, 0);
+  assert.equal((await post(second, "group-approval", cookie, { chatId: "-123", approved: false })).status, 200);
+  assert.deepEqual((await get(first, "/api/telegram/events", memberCookie)).body.events, []);
+  assert.equal((await get(second, "/private-rope-jam-poster.jpg", memberCookie)).status, 403);
   assert.equal((await request(second).post("/api/telegram/logout").set("Host", "private.example").set("Origin", origin).set("Cookie", cookie)).status, 200);
   assert.equal((await get(first, bundle, cookie)).status, 401);
-  console.log("Packaged Vercel function verified: isolated dependencies, private files, shared login/logout, missing-config denial, no public static assets.");
+  console.log("Packaged Vercel function verified: shared sessions and RSVPs, group revocation, protected event content, private files, no public static assets.");
 } finally {
+  globalThis.fetch = savedFetch;
   process.env = savedEnv;
   await rm(directory, { recursive: true, force: true });
 }

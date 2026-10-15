@@ -7,6 +7,9 @@ import { SESSION_SECONDS, TelegramSessions, verifyBrowserToken, verifyMiniAppDat
 import { AuthStorageError, MemoryLoginState, type LoginState } from "./authStorage";
 import { createGroupAccess, createMemoryGroupStore, GroupAccessError, type GroupAccess } from "./groupAccess";
 import { canViewEvents, createMemoryUserAccessStore, type UserAccessStore } from "./userAccess";
+import { createEventAttendance, createMemoryAttendanceStore, isAttendanceResponse, type AttendanceStore } from "./eventAttendance";
+import { eventCatalog } from "../src/data/eventCatalog";
+import { sendAttendanceNotification, type AttendanceNotifier } from "./attendanceNotification";
 
 export function allowLocalRosterRequest({ remoteAddress, host, origin, fetchSite }: {
   remoteAddress?: string; host?: string; origin?: string; fetchSite?: string;
@@ -53,6 +56,8 @@ export interface TelegramMiddlewareOptions {
   rosterLoader?: typeof loadGroupRoster;
   groups?: GroupAccess;
   users?: UserAccessStore;
+  attendance?: AttendanceStore;
+  attendanceNotifier?: AttendanceNotifier;
 }
 
 export function createTelegramMiddleware(configReader: () => TelegramServerConfig, options: TelegramMiddlewareOptions) {
@@ -62,6 +67,7 @@ export function createTelegramMiddleware(configReader: () => TelegramServerConfi
   const loginState = options.loginState ?? new MemoryLoginState();
   const groups = options.groups ?? createGroupAccess(createMemoryGroupStore(), configReader);
   const users = options.users ?? createMemoryUserAccessStore();
+  const events = createEventAttendance({ store: options.attendance ?? createMemoryAttendanceStore(), groups, users, configReader, rosterLoader });
   const prefix = options.prefix;
   const sessionCookie = sessionCookieName(options.secureCookies === true);
   const challengeCookie = options.secureCookies ? "__Host-ropelab_telegram_challenge" : "ropelab_telegram_challenge";
@@ -82,7 +88,7 @@ export function createTelegramMiddleware(configReader: () => TelegramServerConfi
     if (!(options.localOnly ? allowLocalRosterRequest(boundary) : allowHostedRequest(boundary, options.origin!)))
       return send(403, { error: "Open Telegram administration from this app." });
     const origin = options.localOnly ? `http://${req.headers.host}` : options.origin!;
-    const method = ["authenticate", "logout", "login-challenge", "group-approval", "user-access"].includes(route) ? "POST" : "GET";
+    const method = ["authenticate", "logout", "login-challenge", "group-approval", "user-access", "rsvp", "rsvp-notification", "event-group"].includes(route) ? "POST" : "GET";
     if (req.method !== method) { res.setHeader("Allow", method); return send(405, { error: `Use ${method} for this request.` }); }
     // All mutations require an explicit exact Origin, including login and logout.
     if (method === "POST" && req.headers.origin !== origin)
@@ -144,6 +150,46 @@ export function createTelegramMiddleware(configReader: () => TelegramServerConfi
           if (error instanceof AuthStorageError || error instanceof GroupAccessError) throw error;
           return send(401, { error: "Telegram sign-in could not be verified. Please sign in again." });
         }
+      }
+      if (["events", "attendance", "rsvp", "rsvp-notification", "event-group"].includes(route)) {
+        const session = await sessions.get(token);
+        if (!session) return send(401, { error: "Sign in with Telegram to view event invitations." });
+        const stillAuthorized = async () => Boolean(await sessions.get(token));
+        if (route === "events") {
+          const result = await events.visibleEvents(session);
+          if (!await stillAuthorized()) return send(401, { error: "Your session expired. Sign in again." });
+          return send(200, result);
+        }
+        if (route === "attendance") {
+          const result = await events.attendance(session, url.searchParams.get("eventId") ?? "");
+          if (!await stillAuthorized()) return send(401, { error: "Your session expired. Sign in again." });
+          return send(200, result);
+        }
+        if (!req.headers["content-type"]?.startsWith("application/json")) return send(415, { error: "Use a JSON request." });
+        let body;
+        try { body = await readBody(req); } catch { return send(400, { error: "Enter a valid event request." }); }
+        if (typeof body.eventId !== "string") return send(400, { error: "Choose a valid event." });
+        if (route === "event-group") {
+          if (typeof body.chatId !== "string") return send(400, { error: "Choose a valid event group." });
+          await events.setGroup(session, body.eventId, body.chatId, async () => (await sessions.get(token))?.isSystemAdmin === true);
+          return send(200, { ok: true });
+        }
+        if (!isAttendanceResponse(body.response)) return send(400, { error: "Choose Going, Not going, or Pending." });
+        if (body.rulesVersion !== undefined && typeof body.rulesVersion !== "string") return send(400, { error: "Choose a valid house rules version." });
+        if (body.acceptedRuleIds !== undefined && (!Array.isArray(body.acceptedRuleIds) || !body.acceptedRuleIds.every(id => typeof id === "string")))
+          return send(400, { error: "Choose valid house rule acknowledgements." });
+        const response = body.response;
+        const result = route === "rsvp-notification" ? { response } : await events.reply(session, body.eventId, response, stillAuthorized, body.rulesVersion, body.acceptedRuleIds);
+        if (!await stillAuthorized()) return send(401, { error: "Your session expired. Sign in again." });
+        if (route === "rsvp" && body.deferNotification === true) return send(200, result);
+        const event = route === "rsvp-notification"
+          ? await events.notificationEvent(session, body.eventId, response, stillAuthorized)
+          : eventCatalog.find(item => item.id === body.eventId)!;
+        let notificationSent = false;
+        try {
+          notificationSent = await (options.attendanceNotifier ?? sendAttendanceNotification)(configReader().token, Number(session.user.id), event, result.response);
+        } catch { /* A saved response remains valid when bot messaging fails. */ }
+        return send(200, { ...result, notificationSent });
       }
       if (!["group-members", "groups", "group-approval", "users", "user-access"].includes(route)) return send(404, { error: "Unknown Telegram endpoint." });
       const session = await sessions.get(token);

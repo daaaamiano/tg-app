@@ -18,7 +18,7 @@ export interface GroupAccess {
   list(): Promise<AuthorizedGroup[]>;
   setApproval(chatId: string, approved: boolean, adminId: number, stillAuthorized?: () => Promise<boolean>): Promise<void>;
   hasGroup(chatId: string): Promise<boolean>;
-  canViewEvents(userId: number): Promise<boolean>;
+  canViewEvents(userId: number, chatIds?: string[]): Promise<boolean>;
 }
 type BotApi = <T>(method: string, body?: object) => Promise<T>;
 interface Member { status: string; is_member?: boolean; user: { id: number; first_name: string; is_bot: boolean } }
@@ -145,8 +145,8 @@ export function createGroupAccess(store: GroupStore, configReader: () => Telegra
       if (stillAuthorized && !await stillAuthorized()) throw new GroupAccessError(401, "Your admin session expired. Sign in again.");
       await store.setApproval(chatId, approved, adminId, stillAuthorized);
     },
-    async canViewEvents(userId) {
-      const groups = (await store.list()).filter(group => group.approved);
+    async canViewEvents(userId, chatIds) {
+      const groups = (await store.list()).filter(group => group.approved && (!chatIds || chatIds.includes(group.chatId)));
       if (!groups.length) return false;
       const bot = await api<{ id: number }>("getMe");
       let unavailable = false;

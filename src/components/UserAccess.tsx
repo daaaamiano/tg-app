@@ -23,7 +23,7 @@ export function UserAccess({ onSessionInvalid, onAdded }: { onSessionInvalid: ()
   return (
     <details className="user-access">
       <summary><UserPlus size={15} /> Add user by Telegram ID</summary>
-      <p className="member-note">Give someone access without an approved group.</p>
+      <p className="member-note">Grant app access by Telegram ID. Event invitations still require membership in the event’s group.</p>
       <form className="user-access-form" onSubmit={event => { event.preventDefault(); if (validId && !pending) void add(); }}>
         <label>Telegram user ID<input required inputMode="numeric" pattern="[1-9][0-9]{0,15}" placeholder="e.g. 123456789" value={userId} disabled={pending} onChange={event => setUserId(event.target.value)} /></label>
         <label>Name (optional)<input maxLength={100} placeholder="A name to recognize them" value={name} disabled={pending} onChange={event => setName(event.target.value)} /></label>

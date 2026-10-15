@@ -7,6 +7,23 @@ afterEach(() => {
 });
 
 describe("event and Telegram API boundary", () => {
+  it("loads private event invitations through the authenticated same-origin endpoint, even with mock configured", async () => {
+    vi.stubEnv("VITE_PRIVATE_SERVICE", "true");
+    vi.stubEnv("VITE_DATA_SOURCE", "mock");
+    const data = { events: [] };
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => data });
+    vi.stubGlobal("fetch", fetch);
+    const { getEvent } = await import("./api");
+    expect(await getEvent()).toEqual(data);
+    expect(fetch).toHaveBeenCalledWith("/api/telegram/events", expect.objectContaining({ credentials: "same-origin", cache: "no-store" }));
+  });
+
+  it("withholds preview event data if the private invitation endpoint fails", async () => {
+    vi.stubEnv("VITE_PRIVATE_SERVICE", "true");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: "Invitation unavailable" }) }));
+    const { getEvent } = await import("./api");
+    await expect(getEvent()).rejects.toThrow("Invitation unavailable");
+  });
   it("loads demo data without a network request by default", async () => {
     vi.stubEnv("VITE_DATA_SOURCE", "mock");
     const fetch = vi.fn();

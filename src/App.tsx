@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowRight,
@@ -16,7 +16,7 @@ import { GroupApprovals } from "./components/GroupApprovals";
 import { TelegramBrowserLogin } from "./components/TelegramBrowserLogin";
 import { RopeParallax } from "./components/RopeParallax";
 import { useWebAccount } from "./components/AppAuthProvider";
-import { houseRules } from "./data/event";
+import { HouseRules } from "./components/HouseRules";
 import {
   apiConfigured,
   authenticateTelegram,
@@ -43,8 +43,18 @@ import { isLoginPath } from "./lib/paths";
 import { useOrganizationAccount } from "./lib/useOrganizationAccount";
 import { organizationAuthAvailable, privateServiceMode } from "./lib/organization";
 import { accessDeniedCopy } from "./lib/accessCopy";
+import { EventParticipation, type EventSection } from "./components/EventParticipation";
 
-type View = "event" | "events" | "groups";
+type View = "event" | "events" | "groups" | "rules";
+
+function viewFromHash(): View {
+  switch (window.location.hash) {
+    case "#organization": return "groups";
+    case "#events": return "events";
+    case "#house-rules": return "rules";
+    default: return "event";
+  }
+}
 
 function RopeMark() {
   return (
@@ -72,7 +82,7 @@ function RopeMark() {
 export default function App() {
   const [data, setData] = useState<EventData | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [view, setView] = useState<View>(() => window.location.hash === "#organization" ? "groups" : window.location.hash === "#events" ? "events" : "event");
+  const [view, setView] = useState<View>(viewFromHash);
   const [period, setPeriod] = useState<EventPeriod>("upcoming");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAccount, setShowAccount] = useState(
@@ -82,8 +92,10 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
   const [notice, setNotice] = useState("");
-  const [jumpToRules, setJumpToRules] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [eventSection, setEventSection] = useState<EventSection>("event");
+  const [rulesEventId, setRulesEventId] = useState<string | null>(null);
+  const [eventVersion, setEventVersion] = useState(0);
   const webAccount = useWebAccount();
   const organization = useOrganizationAccount();
   const auth: AuthSession | null = organization.session
@@ -99,25 +111,28 @@ export default function App() {
     filterEvents(allEvents, "upcoming", now)[0] ??
     filterEvents(allEvents, "past", now)[0];
   const isPast = event ? new Date(event.endsAt) <= now : false;
+  const previewParticipation = !privateServiceMode && !organization.session && (auth?.mode === "demo" || auth?.mode === "telegram-preview");
+  const showParticipation = Boolean(organization.session || previewParticipation);
+  const confirmingRules = view === "rules" && rulesEventId === event?.id && showParticipation && Boolean(auth);
 
   function load() {
-    setLoadError("");
-    getEvent()
-      .then(setData)
-      .catch((error) =>
-        setLoadError(
-          error instanceof Error
-            ? error.message
-            : "The event could not be loaded."
-        )
-      );
+    setEventVersion(version => version + 1);
   }
   useEffect(() => {
+    setData(null); setLoadError("");
     if (privateServiceMode && !canViewEvents) { setData(null); return; }
-    load();
-  }, [canViewEvents]);
+    const controller = new AbortController();
+    getEvent(Boolean(organization.session), controller.signal)
+      .then(result => { if (!controller.signal.aborted) setData(result); })
+      .catch(error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "The events could not be loaded."); });
+    return () => controller.abort();
+  }, [canViewEvents, organization.session?.user.id, eventVersion]);
   useEffect(() => {
-    const changeView = () => setView(window.location.hash === "#organization" ? "groups" : window.location.hash === "#events" ? "events" : "event");
+    const changeView = () => {
+      const next = viewFromHash();
+      setView(next);
+      if (next !== "rules") setRulesEventId(null);
+    };
     window.addEventListener("hashchange", changeView);
     return () => window.removeEventListener("hashchange", changeView);
   }, []);
@@ -130,24 +145,33 @@ export default function App() {
     const timeout = window.setTimeout(() => setNotice(""), 3500);
     return () => window.clearTimeout(timeout);
   }, [notice]);
-  useEffect(() => {
-    if (!jumpToRules || view !== "event" || !event) return;
-    document
-      .getElementById("house-rules")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setJumpToRules(false);
-  }, [jumpToRules, view, event]);
-
   function navigate(next: View) {
+    setRulesEventId(null);
     setView(next);
-    window.location.hash = next === "groups" ? "organization" : next === "events" ? "events" : "";
-    setJumpToRules(false);
+    if (next === "event") setEventSection("event");
+    window.location.hash = next === "groups" ? "organization" : next === "events" ? "events" : next === "rules" ? "house-rules" : "";
     haptic();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: next === "rules" ? "instant" : "smooth" });
+  }
+  function confirmRulesForEvent() {
+    if (!event) return;
+    navigate("rules");
+    setRulesEventId(event.id);
   }
   function openEvent(item: RopeEvent) {
     setSelectedId(item.id);
+    setEventSection("event");
     navigate("event");
+  }
+  function invitationAccessChanged() {
+    void organization.refresh();
+    load();
+  }
+  async function connectTelegram(proof: { initData: string } | { idToken: string }) {
+    await organization.authenticate(proof);
+    navigate("event");
+    setShowAccount(false);
+    setNotice("Signed in with Telegram");
   }
   function openAccount() {
     setAuthError("");
@@ -200,6 +224,7 @@ export default function App() {
         setLocalAuth({ user, mode: "telegram-preview" });
       }
       setShowAccount(false);
+      navigate("event");
       setNotice(
         apiConfigured || organizationAuthAvailable
           ? "Signed in with Telegram"
@@ -247,236 +272,15 @@ export default function App() {
     setNotice("Calendar file downloaded. Open it to add the jam.");
   }
 
-  // Clear the private UI after session expiry/logout even when the JS is already loaded.
-  if (privateServiceMode && !canViewEvents) return (
-    <div className="app-shell">
-      <header className="site-header"><span>private rope jam.</span></header>
-      <main><section className="empty-state">
-        <span className="eyebrow">PRIVATE ROPE JAM</span>
-        <h1>{!organization.loading && organization.session ? accessDeniedCopy.title : "Your place in the circle."}</h1>
-        {organization.loading ? <p role="status">Authenticating with Telegram…</p> : <>
-          <p>{organization.session ? accessDeniedCopy.description : "Sign in with Telegram to continue."}</p>
-          {organization.session && <p>{accessDeniedCopy.help}</p>}
-          <TelegramBrowserLogin onAuthenticate={organization.authenticate} />
-          {organization.session && <button className="text-link" onClick={() => void signOut()}>Sign out <ArrowRight size={14} /></button>}
-          {authError && <p className="error-message" role="alert">{authError}</p>}
-        </>}
-      </section></main>
-    </div>
-  );
-
-  return (
-    <div className="app-shell">
-      <header className="site-header">
-        <button
-          className="wordmark"
-          onClick={() => {
-            setSelectedId(null);
-            navigate("event");
-          }}
-          aria-label="Private Rope Jam home"
-        >
-          <RopeMark />
-          <span>
-            private
-            <br />
-            rope jam<span className="wordmark-dot">.</span>
-          </span>
-        </button>
-        <nav className="desktop-nav" aria-label="Main navigation">
-          <button
-            className={view === "event" ? "active" : ""}
-            aria-current={view === "event" ? "page" : undefined}
-            onClick={() => navigate("event")}
-          >
-            The jam
-          </button>
-          <button
-            className={view === "events" ? "active" : ""}
-            aria-current={view === "events" ? "page" : undefined}
-            onClick={() => navigate("events")}
-          >
-            All events
-          </button>
-          <button
-            onClick={() => {
-              navigate("event");
-              setJumpToRules(true);
-            }}
-          >
-            House rules <ArrowDown size={12} />
-          </button>
-          {isSystemAdmin && (
-            <a className={view === "groups" ? "active" : ""} href="#organization" aria-current={view === "groups" ? "page" : undefined}>
-              Organization
-            </a>
-          )}
-        </nav>
-        <button
-          className={`account-button ${auth ? "connected" : ""}`}
-          onClick={openAccount}
-          disabled={webAccount.isLoading}
-          aria-label={
-            auth
-              ? `Account for ${auth.user.first_name}`
-              : "Sign in to your account"
-          }
-        >
-          <UserRound size={16} />
-          <span>
-            {webAccount.isLoading
-              ? "Connecting…"
-              : auth
-              ? auth.user.first_name
-              : "Your account"}
-          </span>
-          <ArrowUpRight size={13} />
-        </button>
-      </header>
-
-      <main>
-        {view === "groups" ? (
-          organization.loading ? (
-            <section className="empty-state" role="status"><p>Checking organization access…</p></section>
-          ) : isSystemAdmin ? (
-            <GroupApprovals adminUserId={String(organization.session!.user.id)} onBack={() => navigate("event")} onSessionInvalid={() => void organization.refresh()} />
-          ) : (
-            <section className="empty-state">
-              <span className="eyebrow">ADMIN ACCESS</span>
-              <h1>Administrator sign-in required.</h1>
-              <p>{organization.session ? "This Telegram account does not have organization access." : "Sign in with the administrator’s Telegram account to manage the organization."}</p>
-              {!organization.session && <button className="primary-button" onClick={openAccount}>Sign in <ArrowRight size={16} /></button>}
-              <button className="text-link" onClick={() => navigate("event")}>Back to the event <ArrowRight size={16} /></button>
-            </section>
-          )
-        ) : loadError ? (
-          <section className="empty-state error-state">
-            <span className="eyebrow">LET’S TRY AGAIN</span>
-            <h1>A loose end.</h1>
-            <p role="alert">{loadError}</p>
-            <button className="primary-button" onClick={load}>
-              Reload the event <ArrowRight size={16} />
-            </button>
-          </section>
-        ) : !data ? (
-          <section className="empty-state" role="status">
-            <RopeMark />
-            <p>Getting the room ready…</p>
-          </section>
-        ) : view === "events" ? (
-          <section className="events-page">
-            <div className="events-heading">
-              <div>
-                <span className="eyebrow">A SMALL CIRCLE, EVERY TIME</span>
-                <h1>The gatherings.</h1>
-              </div>
-              <p>
-                Dates to come.
-                <br />
-                Evenings we’ve shared.
-              </p>
-            </div>
-            <div
-              className="events-tabs"
-              role="group"
-              aria-label="Browse events"
-            >
-              {(["upcoming", "past"] as const).map((value) => (
-                <button
-                  key={value}
-                  className={period === value ? "selected" : ""}
-                  aria-pressed={period === value}
-                  onClick={() => {
-                    setPeriod(value);
-                    haptic();
-                  }}
-                >
-                  {value === "upcoming" ? "Upcoming" : "Past events"}
-                  <span>{filterEvents(allEvents, value, now).length}</span>
-                </button>
-              ))}
-            </div>
-            {visibleEvents.length ? (
-              <div className="event-list">
-                {visibleEvents.map((item) => (
-                  <button
-                    key={item.id}
-                    className="event-card"
-                    onClick={() => openEvent(item)}
-                  >
-                    <img src={item.poster} alt="Private Rope Jam invitation" />
-                    <div className="event-card-content">
-                      <span className="eyebrow">
-                        {period === "past"
-                          ? "PAST GATHERING"
-                          : "NEXT GATHERING"}
-                      </span>
-                      <h2>{item.name}</h2>
-                      <p>{eventDate(item)}</p>
-                      <span>
-                        {eventTime(item)}–{eventTime(item, item.endsAt)}{" "}
-                        <span className="small-dot">·</span> {item.venue}
-                      </span>
-                      <div className="event-card-bottom">
-                        <span>
-                          {item.price.toFixed(2)}€{" "}
-                          <span className="small-dot">·</span> {item.capacity}{" "}
-                          people <span className="small-dot">·</span>{" "}
-                          {item.inviteOnly ? "Invite-only" : "Gathering"}
-                        </span>
-                        <span className="circle-arrow">
-                          <ArrowUpRight size={19} />
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state archive-empty">
-                <RopeMark />
-                <h2>
-                  {period === "past"
-                    ? "Our story starts here."
-                    : "A little pause between knots."}
-                </h2>
-                <p>
-                  {period === "past"
-                    ? "No past gatherings yet. Our first jam is coming up."
-                    : "No new dates announced yet. Come back for the next gathering."}
-                </p>
-                <button
-                  className="text-link"
-                  onClick={() =>
-                    setPeriod(period === "past" ? "upcoming" : "past")
-                  }
-                >
-                  {period === "past"
-                    ? "See the upcoming jam"
-                    : "Browse past events"}
-                  <ArrowRight size={15} />
-                </button>
-              </div>
-            )}
-            <p className="events-footnote">
-              {allEvents.length === 1
-                ? "One announced gathering. More dates will appear here when they’re ready."
-                : "Small gatherings, shared on our own terms."}
-            </p>
-          </section>
-        ) : !event ? (
-          <section className="empty-state">
-            <h1>See you soon.</h1>
-            <p>No gatherings announced yet.</p>
-          </section>
-        ) : (
-          <div className="event-page">
+  function renderEventDetails(responseBox?: ReactNode) {
+    if (!event) return null;
+    return <>
             <RopeParallax />
             <section className="event-hero">
               <div className="hero-copy">
                 <div className="hero-eyebrow">
                   <span className="status-dot" />
-                  {isPast ? "A PAST GATHERING" : "A PRIVATE SHIBARI GATHERING"}
+                  {isPast ? "PAST EVENT" : "PRIVATE SHIBARI PRACTICE SESSION"}
                   <span className="edition-number">
                     Nº {String(allEvents.indexOf(event) + 1).padStart(2, "0")}
                   </span>
@@ -493,9 +297,7 @@ export default function App() {
                   )}
                 </h1>
                 <p className="hero-description">
-                  A small, vetted circle. A friendly space.
-                  <br />
-                  You’ll probably already know each other.
+                  Private shibari practice session.
                 </p>
                 <div className="facts-grid hero-facts">
                   <article className="fact">
@@ -555,6 +357,7 @@ export default function App() {
                     </a>
                   </article>
                 </div>
+                {responseBox}
                 <div className="hero-actions">
                   {!isPast && (
                     <button
@@ -567,17 +370,8 @@ export default function App() {
                     </button>
                   )}
                   <a className="text-link" href="#practical">
-                    The practical bits <ArrowDown size={15} />
+                    Practical information <ArrowDown size={15} />
                   </a>
-                  {isSystemAdmin && <a className="text-link" href="#organization">Organization <ArrowUpRight size={15} /></a>}
-                </div>
-                <div className="private-note">
-                  <span className="tiny-line" />
-                  <span>
-                    {event.inviteOnly
-                      ? "Invite-only. Everyone is vetted."
-                      : "A small gathering."}
-                  </span>
                 </div>
               </div>
               <figure className="poster-frame">
@@ -604,7 +398,7 @@ export default function App() {
                   }`}
                 />
                 <figcaption>
-                  <span>A LITTLE ROPE. GOOD COMPANY.</span>
+                  <span>PRIVATE SHIBARI PRACTICE SESSION</span>
                   <span>{event.city.toUpperCase()} ↗</span>
                 </figcaption>
               </figure>
@@ -623,9 +417,7 @@ export default function App() {
                 <div>
                   <span className="note-number">01</span>
                   <p>
-                    <strong>{event.capacity} people. All vetted.</strong> A
-                    private gathering, with familiar faces. Please don’t bring
-                    anyone who hasn’t been invited.
+                    <strong>Capacity: {event.capacity} people.</strong> Please don’t bring uninvited guests.
                   </p>
                 </div>
                 <div>
@@ -641,48 +433,19 @@ export default function App() {
                   </p>
                 </div>
               </div>
+              <div className="event-rules-link">
+                <p>Our house rules apply to every gathering.</p>
+                <a className="text-link" href="#house-rules" onClick={e => { e.preventDefault(); navigate("rules"); }}>
+                  Read the house rules <ArrowRight size={15} />
+                </a>
+              </div>
             </section>
 
-            <section
-              className="house-rules"
-              id="house-rules"
-              aria-labelledby="rules-heading"
-            >
-              <div className="rules-intro">
-                <span className="eyebrow">02 / HOW WE SHARE THE ROOM</span>
-                <h2 id="rules-heading">
-                  Friendly.
-                  <br />
-                  <em>Consent-led.</em>
-                </h2>
-                <p>
-                  A few shared agreements.
-                  <br />
-                  Everyone’s comfort matters.
-                </p>
-                <span className="rules-stamp">
-                  ALL GENDERS. ALL BODIES. RESPECT.
-                </span>
-              </div>
-              <div className="rules-list">
-                {houseRules.map((rule, index) => (
-                  <article className="rule" key={rule.title}>
-                    <span className="rule-number">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <div>
-                      <h3>{rule.title}</h3>
-                      <p>{rule.text}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
             <section className="next-gathering">
               <div>
-                <span className="eyebrow">THERE’S A THREAD TO FOLLOW</span>
-                <h2>Same circle. Next time.</h2>
-                <p>Find upcoming dates and previous gatherings in one place.</p>
+                <span className="eyebrow">EVENTS</span>
+                <h2>Other events.</h2>
+                <p>Browse upcoming and past events.</p>
               </div>
               <button
                 className="outline-button"
@@ -691,6 +454,240 @@ export default function App() {
                 Browse all events <ArrowUpRight size={16} />
               </button>
             </section>
+    </>;
+  }
+
+  // Clear the private UI after session expiry/logout even when the JS is already loaded.
+  if (privateServiceMode && !canViewEvents) return (
+    <div className="app-shell">
+      <header className="site-header"><span>private rope jam.</span></header>
+      <main><section className="empty-state">
+        <span className="eyebrow">PRIVATE ROPE JAM</span>
+        <h1>{!organization.loading && organization.session ? accessDeniedCopy.title : "Sign in to view invitations."}</h1>
+        {organization.loading ? <p role="status">Authenticating with Telegram…</p> : <>
+          <p>{organization.session ? accessDeniedCopy.description : "Sign in with Telegram to continue."}</p>
+          {organization.session && <p>{accessDeniedCopy.help}</p>}
+          <TelegramBrowserLogin onAuthenticate={connectTelegram} />
+          {organization.session && <button className="text-link" onClick={() => void signOut()}>Sign out <ArrowRight size={14} /></button>}
+          {authError && <p className="error-message" role="alert">{authError}</p>}
+        </>}
+      </section></main>
+    </div>
+  );
+
+  return (
+    <div className="app-shell">
+      <header className="site-header">
+        <button
+          className="wordmark"
+          onClick={() => {
+            setSelectedId(null);
+            navigate("event");
+          }}
+          aria-label="Private Rope Jam home"
+        >
+          <RopeMark />
+          <span>
+            private
+            <br />
+            rope jam<span className="wordmark-dot">.</span>
+          </span>
+        </button>
+        <nav className="desktop-nav" aria-label="Main navigation">
+          <button
+            className={view === "event" ? "active" : ""}
+            aria-current={view === "event" ? "page" : undefined}
+            onClick={() => navigate("event")}
+          >
+            Event
+          </button>
+          <button
+            className={view === "events" ? "active" : ""}
+            aria-current={view === "events" ? "page" : undefined}
+            onClick={() => navigate("events")}
+          >
+            All events
+          </button>
+          <button
+            className={view === "rules" ? "active" : ""}
+            aria-current={view === "rules" ? "page" : undefined}
+            onClick={() => navigate("rules")}
+          >
+            House rules
+          </button>
+          {isSystemAdmin && (
+            <a className={view === "groups" ? "active" : ""} href="#organization" aria-current={view === "groups" ? "page" : undefined}>
+              Organization
+            </a>
+          )}
+        </nav>
+        <button
+          className={`account-button ${auth ? "connected" : ""}`}
+          onClick={openAccount}
+          disabled={webAccount.isLoading}
+          aria-label={
+            auth
+              ? `Account for ${auth.user.first_name}`
+              : "Sign in to your account"
+          }
+        >
+          <UserRound size={16} />
+          <span>
+            {webAccount.isLoading
+              ? "Connecting…"
+              : auth
+              ? auth.user.first_name
+              : "Your account"}
+          </span>
+          <ArrowUpRight size={13} />
+        </button>
+      </header>
+
+      <main>
+        {view === "groups" ? (
+          organization.loading ? (
+            <section className="empty-state" role="status"><p>Checking organization access…</p></section>
+          ) : isSystemAdmin ? (
+            <GroupApprovals adminUserId={String(organization.session!.user.id)} onBack={() => navigate("event")} onSessionInvalid={() => void organization.refresh()} />
+          ) : (
+            <section className="empty-state">
+              <span className="eyebrow">ADMIN ACCESS</span>
+              <h1>Administrator sign-in required.</h1>
+              <p>{organization.session ? "This Telegram account does not have organization access." : "Sign in with the administrator’s Telegram account to manage the organization."}</p>
+              {!organization.session && <button className="primary-button" onClick={openAccount}>Sign in <ArrowRight size={16} /></button>}
+              <button className="text-link" onClick={() => navigate("event")}>Back to the event <ArrowRight size={16} /></button>
+            </section>
+          )
+        ) : view === "rules" && !confirmingRules ? (
+          <HouseRules />
+        ) : loadError ? (
+          <section className="empty-state error-state">
+            <span className="eyebrow">LET’S TRY AGAIN</span>
+            <h1>A loose end.</h1>
+            <p role="alert">{loadError}</p>
+            <button className="primary-button" onClick={load}>
+              Reload the event <ArrowRight size={16} />
+            </button>
+          </section>
+        ) : !data ? (
+          <section className="empty-state" role="status">
+            <RopeMark />
+            <p>Getting the room ready…</p>
+          </section>
+        ) : view === "events" ? (
+          <section className="events-page">
+            <div className="events-heading">
+              <div>
+                <span className="eyebrow">A SMALL CIRCLE, EVERY TIME</span>
+                <h1>The gatherings.</h1>
+              </div>
+              <p>
+                Dates to come.
+                <br />
+                Evenings we’ve shared.
+              </p>
+            </div>
+            <div
+              className="events-tabs"
+              role="group"
+              aria-label="Browse events"
+            >
+              {(["upcoming", "past"] as const).map((value) => (
+                <button
+                  key={value}
+                  className={period === value ? "selected" : ""}
+                  aria-pressed={period === value}
+                  onClick={() => {
+                    setPeriod(value);
+                    haptic();
+                  }}
+                >
+                  {value === "upcoming" ? "Upcoming" : "Past events"}
+                  <span>{filterEvents(allEvents, value, now).length}</span>
+                </button>
+              ))}
+            </div>
+            {visibleEvents.length ? (
+              <div className="event-list">
+                {visibleEvents.map((item) => (
+                  <button
+                    key={item.id}
+                    className="event-card"
+                    onClick={() => openEvent(item)}
+                  >
+                    <img src={item.poster} alt="Private Rope Jam invitation" />
+                    <div className="event-card-content">
+                      <span className="eyebrow">
+                        {period === "past"
+                          ? "PAST EVENT"
+                          : "UPCOMING EVENT"}
+                      </span>
+                      <h2>{item.name}</h2>
+                      <p>{eventDate(item)}</p>
+                      <span>
+                        {eventTime(item)}–{eventTime(item, item.endsAt)}{" "}
+                        <span className="small-dot">·</span> {item.venue}
+                      </span>
+                      <div className="event-card-bottom">
+                        <span>
+                          {item.price.toFixed(2)}€{" "}
+                          <span className="small-dot">·</span> {item.capacity}{" "}
+                          people <span className="small-dot">·</span>{" "}
+                          {item.inviteOnly ? "Invite-only" : "Gathering"}
+                        </span>
+                        <span className="circle-arrow">
+                          <ArrowUpRight size={19} />
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state archive-empty">
+                <RopeMark />
+                <h2>
+                  {period === "past"
+                    ? "No past events."
+                    : "No upcoming events."}
+                </h2>
+                <p>
+                  {period === "past"
+                    ? "Past events will appear here after they end."
+                    : "New dates will appear here when announced."}
+                </p>
+                <button
+                  className="text-link"
+                  onClick={() =>
+                    setPeriod(period === "past" ? "upcoming" : "past")
+                  }
+                >
+                  {period === "past"
+                    ? "See upcoming events"
+                    : "Browse past events"}
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+            )}
+            <p className="events-footnote">
+              {allEvents.length === 1
+                ? "One announced event."
+                : "Select an event to view its invitation and details."}
+            </p>
+          </section>
+        ) : !event ? (
+          <section className="empty-state">
+            <h1>No event invitations.</h1>
+            <p>You need to be in an event’s approved group to receive its invitation.</p>
+          </section>
+        ) : (
+          <div className="event-page">
+            {showParticipation && auth ? (
+              <EventParticipation key={`${event.id}:${auth.user.id}`} event={event} user={auth.user} organizer={isSystemAdmin} preview={previewParticipation} section={eventSection} onSection={setEventSection} onAccessChanged={invitationAccessChanged}
+                confirmingRules={confirmingRules} onRulesRequired={confirmRulesForEvent} onRulesBack={() => navigate("event")} onRulesConfirmed={() => { navigate("event"); setNotice("You’re going. See you there."); }}>
+                {responseBox => renderEventDetails(responseBox)}
+              </EventParticipation>
+            ) : renderEventDetails()}
           </div>
         )}
       </main>
@@ -699,7 +696,7 @@ export default function App() {
         <span>
           PRIVATE ROPE JAM <span className="small-dot">·</span> BARCELONA
         </span>
-        <span>Practice rope. Meet people. Have a good time.</span>
+        <span>Private event · Group members only</span>
         {isSystemAdmin && <a className="text-link" href="#organization">Organization <ArrowUpRight size={12} /></a>}
         <button onClick={openAccount}>
           {auth ? "Your account" : "Sign in"}
@@ -709,21 +706,22 @@ export default function App() {
       <nav className="mobile-nav" aria-label="Mobile navigation">
         <button
           className={view === "event" ? "active" : ""}
+          aria-current={view === "event" ? "page" : undefined}
           onClick={() => navigate("event")}
         >
-          The jam
+          Event
         </button>
         <button
           className={view === "events" ? "active" : ""}
+          aria-current={view === "events" ? "page" : undefined}
           onClick={() => navigate("events")}
         >
           All events
         </button>
         <button
-          onClick={() => {
-            navigate("event");
-            setJumpToRules(true);
-          }}
+          className={view === "rules" ? "active" : ""}
+          aria-current={view === "rules" ? "page" : undefined}
+          onClick={() => navigate("rules")}
         >
           House rules
         </button>
@@ -743,7 +741,7 @@ export default function App() {
       {showAccount && (
         <Modal
           title={
-            auth ? `Hi, ${auth.user.first_name}.` : "Your place in the circle."
+            auth ? `Hi, ${auth.user.first_name}.` : "Sign in to view invitations."
           }
           onClose={() => setShowAccount(false)}
         >
@@ -758,15 +756,13 @@ export default function App() {
                   : auth.mode === "telegram-preview"
                   ? "Your Telegram profile is connected in preview mode."
                   : "You’re browsing with a demo profile."}{" "}
-                Attendance is confirmed by the host.
+                Select Going on your event invitation to confirm attendance.
               </p>
               {isSystemAdmin && <p className="login-note">System administrator</p>}
               {!organization.session && organizationAuthAvailable && (
                 <div className="organizer-tools">
                   <p className="login-note">Connect Telegram to check organization access.</p>
-                  <TelegramBrowserLogin onAuthenticate={async (proof) => {
-                    await organization.authenticate(proof); setShowAccount(false); setNotice("Signed in with Telegram");
-                  }} />
+                  <TelegramBrowserLogin onAuthenticate={connectTelegram} />
                 </div>
               )}
               <dl className="account-details">
@@ -813,10 +809,9 @@ export default function App() {
           ) : (
             <>
               <p className="modal-description">
-                Sign in to your event account. This is a private, vetted
-                gathering; signing in doesn’t reserve a place.
+                Sign in with Telegram to check your event invitations. Select Going to confirm attendance.
               </p>
-              {!inTelegram && (
+              {!inTelegram && !organizationAuthAvailable && (
                 <>
                   <button
                     className="primary-button full-width"
@@ -849,9 +844,7 @@ export default function App() {
                 </>
               )}
               {!inTelegram && organizationAuthAvailable ? (
-                <TelegramBrowserLogin onAuthenticate={async (proof) => {
-                  await organization.authenticate(proof); setShowAccount(false); setNotice("Signed in with Telegram");
-                }} />
+                <TelegramBrowserLogin onAuthenticate={connectTelegram} />
               ) : <button
                 className="outline-button full-width"
                 disabled={authBusy || webAccount.isLoading}
@@ -869,7 +862,7 @@ export default function App() {
                   with the event backend.
                 </p>
               )}
-              {usingMockData && (
+              {usingMockData && !privateServiceMode && (
                 <button
                   className="text-link demo-link"
                   disabled={authBusy || webAccount.isLoading}
@@ -879,6 +872,7 @@ export default function App() {
                       mode: "demo",
                     });
                     setShowAccount(false);
+                    navigate("event");
                     setNotice("Browsing with a demo profile");
                   }}
                 >

@@ -9,6 +9,9 @@ import { loadGroupRoster } from "./telegramMembers";
 import { loginCss, loginPage } from "./loginPage";
 import { createGroupAccess, createMemoryGroupStore, GroupAccessError, type GroupAccess } from "./groupAccess";
 import { canViewEvents, createMemoryUserAccessStore, type UserAccessStore } from "./userAccess";
+import { createEventAttendance, createMemoryAttendanceStore, type AttendanceStore } from "./eventAttendance";
+import { eventCatalog } from "../src/data/eventCatalog";
+import type { AttendanceNotifier } from "./attendanceNotification";
 
 export function validatePrivateBuild(dist: string) {
   let marker: unknown;
@@ -18,12 +21,14 @@ export function validatePrivateBuild(dist: string) {
     throw new Error("The frontend must be built for the private service.");
 }
 
-export function createPrivateService({ origin, dist, config, secureCookies, rosterLoader = loadGroupRoster, sessions = new TelegramSessions(), loginState, groups = createGroupAccess(createMemoryGroupStore(), () => config), users = createMemoryUserAccessStore() }: {
+export function createPrivateService({ origin, dist, config, secureCookies, rosterLoader = loadGroupRoster, sessions = new TelegramSessions(), loginState, groups = createGroupAccess(createMemoryGroupStore(), () => config), users = createMemoryUserAccessStore(), attendance = createMemoryAttendanceStore(), attendanceNotifier }: {
   origin: string; dist: string; config: TelegramServerConfig; secureCookies: boolean;
   rosterLoader?: typeof loadGroupRoster;
   sessions?: SessionStore; loginState?: LoginState;
   groups?: GroupAccess;
   users?: UserAccessStore;
+  attendance?: AttendanceStore;
+  attendanceNotifier?: AttendanceNotifier;
 }) {
   const app = express();
   app.disable("x-powered-by");
@@ -50,7 +55,7 @@ export function createPrivateService({ origin, dist, config, secureCookies, rost
 
   // APIs and file serving use the same session store; the server derives every role.
   app.use(createTelegramMiddleware(() => config, {
-    prefix: "/api/telegram/", localOnly: false, origin, secureCookies, sessions, loginState, rosterLoader, groups, users,
+    prefix: "/api/telegram/", localOnly: false, origin, secureCookies, sessions, loginState, rosterLoader, groups, users, attendance, attendanceNotifier,
   }));
   app.use("/api", (_req, res) => { res.status(404).json({ error: "Unknown API endpoint." }); });
   app.get("/signin.css", (_req, res) => { res.type("css").send(loginCss); });
@@ -67,9 +72,10 @@ export function createPrivateService({ origin, dist, config, secureCookies, rost
     res.status(session ? 403 : 401).json({ error: "Sign in with an authorized Telegram account to continue." });
   });
   app.get(["/", "/login", "/login/"], (_req, res) => { res.sendFile(resolve(dist, "index.html")); });
+  const events = createEventAttendance({ store: attendance, groups, users, configReader: () => config, rosterLoader });
   // Function-bundled assets are sent only after the gate above. Vercel's static CDN
   // must never receive the event build, and Express static middleware is unsupported there.
-  app.use((req, res, next) => {
+  app.use(async (req, res, next) => {
     if (!["GET", "HEAD"].includes(req.method)) return next();
     let path: string;
     try { path = decodeURIComponent(req.path); } catch { return next(); }
@@ -77,6 +83,15 @@ export function createPrivateService({ origin, dist, config, secureCookies, rost
     const file = resolve(dist, `.${path}`);
     const within = relative(resolve(dist), file);
     if (!within || within.startsWith("..") || isAbsolute(within)) return next();
+    // Authorize the resolved file, including encoded and trailing-slash URL aliases.
+    const posterEvent = eventCatalog.find(event => resolve(dist, `.${event.poster}`) === file);
+    if (posterEvent) {
+      const token = cookieValue(req, sessionCookieName(secureCookies));
+      const session = await sessions.get(token);
+      if (!session || !await events.canViewEvent(session, posterEvent.id) || !await sessions.get(token)) {
+        res.status(session ? 403 : 401).json({ error: "This event invitation is not available." }); return;
+      }
+    }
     res.sendFile(file, { dotfiles: "deny", cacheControl: false }, (error) => { if (error) next(error); });
   });
   app.use((_req, res) => { res.status(404).json({ error: "Page not found." }); });

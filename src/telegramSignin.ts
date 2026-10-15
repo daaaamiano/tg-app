@@ -14,7 +14,7 @@ function setAuthenticating(authenticating: boolean) {
   main.classList.toggle("authenticating", authenticating);
   main.setAttribute("aria-busy", String(authenticating));
   signin.hidden = authenticating;
-  heading.innerHTML = "Your place<br>in the circle.";
+  heading.innerHTML = "Sign in to view<br>your invitations.";
   description.textContent = authenticating
     ? "Please wait while we check your Telegram account."
     : "Sign in with Telegram to continue.";
@@ -60,7 +60,7 @@ async function prepare() {
 async function authenticate(proof: { idToken: string } | { initData: string }) {
   setAuthenticating(true);
   const result = await api("authenticate", { method: "POST", body: JSON.stringify(proof) });
-  if (result.session.canViewEvents) { location.reload(); return; }
+  if (result.session.canViewEvents) { location.replace(location.pathname); return; }
   showAccessDenied();
   signout.hidden = false;
   challenge = null;

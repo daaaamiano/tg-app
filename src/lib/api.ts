@@ -1,5 +1,5 @@
-import { demoEvent } from "../data/event";
 import type { Attendee, EventData } from "../types/event";
+import { organizationRequest } from "./organization";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
 export const apiConfigured = Boolean(baseUrl);
@@ -20,8 +20,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getEvent(): Promise<EventData> {
-  if (usingMockData) return demoEvent;
+export async function getEvent(telegramSession = false, signal?: AbortSignal): Promise<EventData> {
+  // This compile-time branch removes preview event data from private frontend builds.
+  if (import.meta.env.VITE_PRIVATE_SERVICE === "true" || telegramSession)
+    return organizationRequest<EventData>("events", { signal });
+  if (usingMockData) return (await import("../data/event")).demoEvent;
   return request<EventData>("/event");
 }
 
