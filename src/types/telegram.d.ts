@@ -4,6 +4,11 @@ interface TelegramWebApp {
   initData: string;
   initDataUnsafe: { user?: Attendee & { allows_write_to_pm?: boolean } };
   platform: string;
+  colorScheme?: "light" | "dark";
+  themeParams?: Record<string, string | undefined>;
+  onEvent?(event: "themeChanged", callback: () => void): void;
+  offEvent?(event: "themeChanged", callback: () => void): void;
+  setBottomBarColor?(color: string): void;
   ready(): void;
   expand(): void;
   isVersionAtLeast(version: string): boolean;

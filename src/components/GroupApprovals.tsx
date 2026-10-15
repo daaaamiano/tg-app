@@ -52,7 +52,7 @@ export function GroupApprovals({ onBack, onSessionInvalid, adminUserId }: { onBa
       <div className="groups-heading">
         <div>
           <span className="eyebrow">SYSTEM ADMIN / ACCESS</span>
-          <h1 id="groups-title">Your organization.</h1>
+          <h1 id="groups-title">Organization</h1>
           <p>Approve groups, then open Members to manage individual access.</p>
         </div>
         <span className="group-count"><ShieldCheck size={17} /> {approvedCount} approved</span>

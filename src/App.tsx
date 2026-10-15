@@ -1,20 +1,20 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   CalendarDays,
   Check,
-  Clock3,
-  MapPin,
   Send,
   UserRound,
+  Ticket,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import { Modal } from "./components/Modal";
 import { GroupApprovals } from "./components/GroupApprovals";
 import { TelegramBrowserLogin } from "./components/TelegramBrowserLogin";
-import { RopeParallax } from "./components/RopeParallax";
+import { EventDetails, EventHeading } from "./components/EventDetails";
+import { LottieAnimation } from "./components/LottieAnimation";
 import { useWebAccount } from "./components/AppAuthProvider";
 import { HouseRules } from "./components/HouseRules";
 import {
@@ -29,7 +29,6 @@ import {
   eventDate,
   eventTime,
   filterEvents,
-  mapsUrl,
   type EventPeriod,
 } from "./lib/events";
 import {
@@ -56,28 +55,6 @@ function viewFromHash(): View {
   }
 }
 
-function RopeMark() {
-  return (
-    <svg
-      width="30"
-      height="39"
-      viewBox="0 0 30 39"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M9-3C24 6 0 10 14 19S1 31 11 42M22-3C4 10 32 14 19 23S31 34 21 42"
-        stroke="currentColor"
-        strokeWidth="2.2"
-      />
-      <path
-        d="M8 18C10 13 21 14 23 20S11 27 8 21"
-        stroke="currentColor"
-        strokeWidth="2.2"
-      />
-    </svg>
-  );
-}
 
 export default function App() {
   const [data, setData] = useState<EventData | null>(null);
@@ -269,198 +246,19 @@ export default function App() {
   function saveDate(item: RopeEvent) {
     downloadCalendar(item);
     haptic();
-    setNotice("Calendar file downloaded. Open it to add the jam.");
+    setNotice("Calendar file downloaded. Open it to add the event.");
   }
 
   function renderEventDetails(responseBox?: ReactNode) {
     if (!event) return null;
-    return <>
-            <RopeParallax />
-            <section className="event-hero">
-              <div className="hero-copy">
-                <div className="hero-eyebrow">
-                  <span className="status-dot" />
-                  {isPast ? "PAST EVENT" : "PRIVATE SHIBARI PRACTICE SESSION"}
-                  <span className="edition-number">
-                    Nº {String(allEvents.indexOf(event) + 1).padStart(2, "0")}
-                  </span>
-                </div>
-                <h1>
-                  {event.name === "Private Rope Jam" ? (
-                    <>
-                      Private
-                      <br />
-                      <em>Rope Jam.</em>
-                    </>
-                  ) : (
-                    event.name
-                  )}
-                </h1>
-                <p className="hero-description">
-                  Private shibari practice session.
-                </p>
-                <div className="facts-grid hero-facts">
-                  <article className="fact">
-                    <span className="fact-label">
-                      <CalendarDays size={14} />
-                      WHEN
-                    </span>
-                    <h3>{eventDate(event, true)}</h3>
-                    <p>
-                      {new Intl.DateTimeFormat("en-GB", {
-                        weekday: "long",
-                        timeZone: event.timeZone,
-                      }).format(new Date(event.startsAt))}
-                    </p>
-                  </article>
-                  <article className="fact">
-                    <span className="fact-label">
-                      <Clock3 size={14} />
-                      TIME
-                    </span>
-                    <h3>
-                      {eventTime(event)}–{eventTime(event, event.endsAt)}
-                    </h3>
-                    <p>
-                      Doors from {eventTime(event, event.arrivalFrom)} ·
-                      Barcelona time
-                    </p>
-                  </article>
-                  <article className="fact">
-                    <span className="fact-label">
-                      <span className="currency-icon">€</span>CONTRIBUTION
-                    </span>
-                    <h3>
-                      {event.price.toFixed(2)}
-                      <span className="price-currency">€</span>
-                    </h3>
-                    <p>Per person</p>
-                  </article>
-                  <article className="fact location-fact">
-                    <span className="fact-label">
-                      <MapPin size={14} />
-                      WHERE
-                    </span>
-                    <h3>{event.venue}</h3>
-                    <p>
-                      {event.address}
-                      <br />
-                      {event.neighborhood}, {event.city}
-                    </p>
-                    <a
-                      className="text-link"
-                      href={mapsUrl(event)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open directions <ArrowUpRight size={14} />
-                    </a>
-                  </article>
-                </div>
-                {responseBox}
-                <div className="hero-actions">
-                  {!isPast && (
-                    <button
-                      className="primary-button"
-                      onClick={() => saveDate(event)}
-                    >
-                      <CalendarDays size={16} />
-                      Add to calendar
-                      <ArrowUpRight size={16} />
-                    </button>
-                  )}
-                  <a className="text-link" href="#practical">
-                    Practical information <ArrowDown size={15} />
-                  </a>
-                </div>
-              </div>
-              <figure className="poster-frame">
-                <div className="poster-overline">
-                  <span>THE INVITATION</span>
-                  <span>
-                    {new Intl.DateTimeFormat("en-GB", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "2-digit",
-                      timeZone: event.timeZone,
-                    })
-                      .format(new Date(event.startsAt))
-                      .replace(/\//g, " / ")}
-                  </span>
-                </div>
-                <img
-                  className="event-poster"
-                  src={event.poster}
-                  alt={`${event.name} invitation: ${eventDate(
-                    event
-                  )}, ${eventTime(event)}–${eventTime(event, event.endsAt)}, ${
-                    event.venue
-                  }`}
-                />
-                <figcaption>
-                  <span>PRIVATE SHIBARI PRACTICE SESSION</span>
-                  <span>{event.city.toUpperCase()} ↗</span>
-                </figcaption>
-              </figure>
-            </section>
-
-            <section
-              className="practical-section"
-              id="practical"
-              aria-labelledby="practical-heading"
-            >
-              <div className="section-header">
-                <span className="eyebrow">01 / BEFORE YOU COME</span>
-                <h2 id="practical-heading">Before you come.</h2>
-              </div>
-              <div className="room-notes">
-                <div>
-                  <span className="note-number">01</span>
-                  <p>
-                    <strong>Capacity: {event.capacity} people.</strong> Please don’t bring uninvited guests.
-                  </p>
-                </div>
-                <div>
-                  <span className="note-number">02</span>
-                  <p>
-                    <strong>
-                      {event.suspensionPoints === 1
-                        ? "A suspension point is available."
-                        : `${event.suspensionPoints} suspension points are available.`}
-                    </strong>{" "}
-                    Check with the host before using it. Arrive at{" "}
-                    {eventTime(event)}, or up to 30 minutes early to settle in.
-                  </p>
-                </div>
-              </div>
-              <div className="event-rules-link">
-                <p>Our house rules apply to every gathering.</p>
-                <a className="text-link" href="#house-rules" onClick={e => { e.preventDefault(); navigate("rules"); }}>
-                  Read the house rules <ArrowRight size={15} />
-                </a>
-              </div>
-            </section>
-
-            <section className="next-gathering">
-              <div>
-                <span className="eyebrow">EVENTS</span>
-                <h2>Other events.</h2>
-                <p>Browse upcoming and past events.</p>
-              </div>
-              <button
-                className="outline-button"
-                onClick={() => navigate("events")}
-              >
-                Browse all events <ArrowUpRight size={16} />
-              </button>
-            </section>
-    </>;
+    return <EventDetails event={event} isPast={isPast} responseBox={responseBox} showHeading={!showParticipation}
+      onCalendar={() => saveDate(event)} onRules={() => navigate("rules")} />;
   }
 
   // Clear the private UI after session expiry/logout even when the JS is already loaded.
   if (privateServiceMode && !canViewEvents) return (
     <div className="app-shell">
-      <header className="site-header"><span>private rope jam.</span></header>
+      <header className="site-header"><span className="wordmark"><CalendarDays size={23} /> Rope Jam</span></header>
       <main><section className="empty-state">
         <span className="eyebrow">PRIVATE ROPE JAM</span>
         <h1>{!organization.loading && organization.session ? accessDeniedCopy.title : "Sign in to view invitations."}</h1>
@@ -486,12 +284,8 @@ export default function App() {
           }}
           aria-label="Private Rope Jam home"
         >
-          <RopeMark />
-          <span>
-            private
-            <br />
-            rope jam<span className="wordmark-dot">.</span>
-          </span>
+          <CalendarDays size={23} />
+          <span>Rope Jam<small>Events</small></span>
         </button>
         <nav className="desktop-nav" aria-label="Main navigation">
           <button
@@ -506,14 +300,14 @@ export default function App() {
             aria-current={view === "events" ? "page" : undefined}
             onClick={() => navigate("events")}
           >
-            All events
+            Events
           </button>
           <button
             className={view === "rules" ? "active" : ""}
             aria-current={view === "rules" ? "page" : undefined}
             onClick={() => navigate("rules")}
           >
-            House rules
+            Rules
           </button>
           {isSystemAdmin && (
             <a className={view === "groups" ? "active" : ""} href="#organization" aria-current={view === "groups" ? "page" : undefined}>
@@ -562,29 +356,25 @@ export default function App() {
           <HouseRules />
         ) : loadError ? (
           <section className="empty-state error-state">
-            <span className="eyebrow">LET’S TRY AGAIN</span>
-            <h1>A loose end.</h1>
+            <h1>Couldn’t load events</h1>
             <p role="alert">{loadError}</p>
             <button className="primary-button" onClick={load}>
-              Reload the event <ArrowRight size={16} />
+              Try again <ArrowRight size={16} />
             </button>
           </section>
         ) : !data ? (
           <section className="empty-state" role="status">
-            <RopeMark />
-            <p>Getting the room ready…</p>
+            <LottieAnimation kind="loading" className="page-loading-animation" />
+            <p>Loading events…</p>
           </section>
         ) : view === "events" ? (
           <section className="events-page">
             <div className="events-heading">
               <div>
-                <span className="eyebrow">A SMALL CIRCLE, EVERY TIME</span>
-                <h1>The gatherings.</h1>
+                <h1>Events</h1>
               </div>
               <p>
-                Dates to come.
-                <br />
-                Evenings we’ve shared.
+                Upcoming and past events.
               </p>
             </div>
             <div
@@ -645,7 +435,7 @@ export default function App() {
               </div>
             ) : (
               <div className="empty-state archive-empty">
-                <RopeMark />
+                <CalendarDays size={40} />
                 <h2>
                   {period === "past"
                     ? "No past events."
@@ -677,14 +467,15 @@ export default function App() {
           </section>
         ) : !event ? (
           <section className="empty-state">
-            <h1>No event invitations.</h1>
+            <h1>No invitations</h1>
             <p>You need to be in an event’s approved group to receive its invitation.</p>
           </section>
         ) : (
           <div className="event-page">
+            {showParticipation && !confirmingRules && <EventHeading event={event} />}
             {showParticipation && auth ? (
               <EventParticipation key={`${event.id}:${auth.user.id}`} event={event} user={auth.user} organizer={isSystemAdmin} preview={previewParticipation} section={eventSection} onSection={setEventSection} onAccessChanged={invitationAccessChanged}
-                confirmingRules={confirmingRules} onRulesRequired={confirmRulesForEvent} onRulesBack={() => navigate("event")} onRulesConfirmed={() => { navigate("event"); setNotice("You’re going. See you there."); }}>
+                confirmingRules={confirmingRules} onRulesRequired={confirmRulesForEvent} onRulesBack={() => navigate("event")} onRulesConfirmed={() => { navigate("event"); setNotice("You’re going. Attendance confirmed."); }}>
                 {responseBox => renderEventDetails(responseBox)}
               </EventParticipation>
             ) : renderEventDetails()}
@@ -709,21 +500,21 @@ export default function App() {
           aria-current={view === "event" ? "page" : undefined}
           onClick={() => navigate("event")}
         >
-          Event
+          <Ticket size={21} /> Event
         </button>
         <button
           className={view === "events" ? "active" : ""}
           aria-current={view === "events" ? "page" : undefined}
           onClick={() => navigate("events")}
         >
-          All events
+          <CalendarDays size={21} /> Events
         </button>
         <button
           className={view === "rules" ? "active" : ""}
           aria-current={view === "rules" ? "page" : undefined}
           onClick={() => navigate("rules")}
         >
-          House rules
+          <ShieldCheck size={21} /> Rules
         </button>
       </nav>
       {notice && (
@@ -741,11 +532,11 @@ export default function App() {
       {showAccount && (
         <Modal
           title={
-            auth ? `Hi, ${auth.user.first_name}.` : "Sign in to view invitations."
+            auth ? "Account" : "Sign in"
           }
           onClose={() => setShowAccount(false)}
         >
-          <span className="eyebrow">PRIVATE ROPE JAM / ACCOUNT</span>
+          <span className="eyebrow">ACCOUNT</span>
           {auth ? (
             <>
               <p className="modal-description">

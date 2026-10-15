@@ -68,7 +68,8 @@ try {
   assert.equal(signin.status, 200);
   assert(signin.text.includes("https://oauth.telegram.org"));
   assert(signin.text.includes("origin:window.location.origin"));
-  for (const path of [bundle, "/private-rope-jam-poster.jpg", "/api/telegram/group-members?chatId=-123"])
+  const frontendAssets = assets.filter(name => /\.(js|css)$/.test(name)).map(name => `/assets/${name}`);
+  for (const path of [...frontendAssets, "/private-rope-jam-poster.jpg", "/api/telegram/group-members?chatId=-123"])
     assert.equal((await get(first, path)).status, 401);
   const fields = { auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify({ id: 17666600, first_name: "Test admin" }) };
   const check = Object.entries(fields).map(([k, v]) => `${k}=${v}`).join("\n");
@@ -80,6 +81,7 @@ try {
   assert.equal((await get(second, "/api/telegram/session", cookie)).body.session.isSystemAdmin, true);
   const authorized = await get(second, bundle, cookie);
   assert.equal(authorized.status, 200);
+  for (const path of frontendAssets) assert.equal((await get(second, path, cookie)).status, 200);
   assert.equal(authorized.headers["cache-control"], "private, no-store");
   for (const detail of ["LabCultural", "Rector Triadó", "2026-10-16T19:00:00"])
     assert(!authorized.text.includes(detail), "Private event content must be fetched after event authorization.");

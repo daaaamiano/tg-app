@@ -1,6 +1,6 @@
 # Private Rope Jam · Web + Telegram
 
-A minimal React + TypeScript event companion for a private, friendly shibari gathering. The app works in a normal browser and as a Telegram Mini App. Web sign-in uses WorkOS AuthKit; Telegram retains its profile/launch-data flow.
+A React + TypeScript event companion for Private Rope Jam with a Telegram-style interface. The app works in a normal browser and as a Telegram Mini App. Web sign-in uses WorkOS AuthKit; Telegram retains its profile/launch-data flow.
 
 ## Run
 
@@ -24,21 +24,40 @@ Open http://127.0.0.1:5178. `npm run build` creates `dist/`, and `npm test` runs
 
 The details come from the supplied poster and organizer instructions. The photo is used as provided at `public/private-rope-jam-poster.jpg`. No attendee identities are shown. House rules include an adults-only agreement.
 
-A single red thread winds through the homepage margins with gentle continuous drift, scroll parallax, and mouse movement. A fixed mask leaves breathing room around the text and poster, including after responsive layout changes. Separate desktop and portrait phone paths keep it visible on both. On phones, the mask follows individual text lines, and stronger idle drift and scroll movement work without a mouse or touch permissions. Movement stops when reduced motion is preferred or the tab is hidden. The poster itself is unchanged.
+The interface uses system fonts, compact event rows, Telegram theme colors, and direct action labels. Event details, People, rules, account, organization tools, and the public sign-in screen share the same visual style. Original Lottie loading and success animations are bundled locally and loaded on demand. Reduced-motion preferences show static frames and disable transitions. The poster is available under Event poster.
 
 **All events** has Upcoming and Past views. There is only one announced event; no fake history or future dates. Events move to Past after their end time, using timestamp offsets. Add actual events in `src/data/eventCatalog.ts`; `src/lib/events.ts` handles ordering, local-time display, and calendar export.
 
 **Add to calendar** downloads an `.ics` file with the correct time zone conversion. The calendar entry is not a reservation. There is no payment, booking, attendee approval, or check-in backend. Signing in does not confirm attendance; the host does.
 
+## Legacy backup and rollback
+
+The complete pre-redesign working tree, including the existing uncommitted attendance and rules work, is preserved in `codex/legacy-pre-telegram-2026-10-15` at `f7ed9fe`. The branch is backed up on the existing GitHub repository. Development, testing, and deployment continue on `main`.
+
+To restore that exact version while keeping deployment on `main`, start with a clean working tree and run:
+
+```sh
+git switch main
+git restore --source=codex/legacy-pre-telegram-2026-10-15 --staged --worktree -- .
+git commit -m "Restore legacy app"
+git push origin main
+```
+
+This restores the saved source and dependency lockfile and removes files introduced by the redesign. The main push triggers the existing production deployment. Local credentials and production database records are not part of this source rollback.
+
+The Telegram redesign keeps the current agreement version and IDs and does not require a database migration. Build and all 115 database-backed tests passed, including packaged-function checks for every JavaScript/CSS asset. Local browser checks covered desktop/mobile layouts, 320px dark mode, reduced-motion confirmation, five-rule gating, saved attendance, People, and returning attendees.
+
 ## Files
 
 - `src/App.tsx`: event homepage, event browser, and account dialog.
 - `src/data/eventCatalog.ts`: announced event content; `src/data/houseRules.ts`: house rules; `src/data/event.ts`: public development preview.
-- `src/components/RopeParallax.tsx`: decorative motion, without an animation dependency.
+- `src/components/EventDetails.tsx`: compact event heading, facts, poster, and calendar/rules actions.
+- `src/components/LottieAnimation.tsx` and `src/lib/animations.ts`: local loading and confirmation animation artwork and player lifecycle.
 - `src/lib/events.ts`: chronological event lists, Barcelona-time formatting, Maps links, and calendar download.
 - `src/components/AppAuthProvider.tsx`: web account integration.
 - `src/lib/api.ts`: authenticated event invitations and public development preview; `server/eventAttendance.ts`: event groups, membership checks, and saved responses.
-- `src/styles.css`: responsive, warm monochrome visual design.
+- `src/styles.css`: responsive Telegram-style design with Telegram/system light and dark themes.
+- `src/lib/telegram.ts`: Telegram theme updates and system chrome colors.
 
 ## Set up new web credentials (WorkOS AuthKit)
 

@@ -5,13 +5,14 @@ import { eventDate } from "../lib/events";
 import type { RopeEvent } from "../types/event";
 import { RuleAcceptanceButton } from "./RuleAcceptanceButton";
 import { ConfirmationButton } from "./ConfirmationButton";
+import { LottieAnimation } from "./LottieAnimation";
 
 export function HouseRules({ confirmation }: { confirmation?: {
   event: RopeEvent; saving: boolean; confirmed: boolean; alreadyAgreed: boolean; unavailable: boolean; error: string;
   onConfirm: (acceptedRuleIds: string[]) => void; onBack: () => void;
 } }) {
   const [acceptedIds, setAcceptedIds] = useState<string[]>(() => confirmation?.alreadyAgreed ? houseRules.map(rule => rule.id) : []);
-  const [collapsedIds, setCollapsedIds] = useState<string[]>(() => confirmation?.alreadyAgreed ? houseRules.map(rule => rule.id) : []);
+  const [collapsedIds, setCollapsedIds] = useState<string[]>(() => confirmation?.alreadyAgreed ? houseRules.map(rule => rule.id) : houseRules.slice(1).map(rule => rule.id));
   const [dockHeight, setDockHeight] = useState(128);
   const dock = useRef<HTMLDivElement>(null);
   const headings = useRef(new Map<string, HTMLButtonElement>());
@@ -53,16 +54,13 @@ export function HouseRules({ confirmation }: { confirmation?: {
   }
 
   return (
-    <section className={`house-rules${confirmation ? " house-rules-confirming" : ""}`} aria-labelledby="rules-heading" style={confirmation ? { paddingBottom: dockHeight + 32 } : undefined}>
+    <section className={`house-rules${confirmation ? " house-rules-confirming" : ""}${confirmation?.confirmed ? " house-rules-confirmed" : ""}`} aria-labelledby="rules-heading" style={confirmation ? { paddingBottom: dockHeight + 32 } : undefined}>
       <div className="rules-intro">
-        {!confirmation && <span className="eyebrow">HOW WE SHARE THE ROOM</span>}
-        <h1 id="rules-heading">
-          {confirmation ? <>Before <em>you join.</em></> : <>House<br /><em>rules.</em></>}
-        </h1>
-        <p>{confirmation ? confirmation.alreadyAgreed ? "You’ve agreed to our house rules. Review them below, then confirm attendance." : "Read each rule and tap “I agree”." : <>Shared agreements for every gathering.<br />Everyone’s comfort matters.</>}</p>
-        {!confirmation && <span className="rules-stamp">ALL GENDERS. ALL BODIES. RESPECT.</span>}
+        {confirmation?.confirmed && <LottieAnimation kind="success" className="rules-success-animation" />}
+        <h1 id="rules-heading">{confirmation?.confirmed ? "You’re going" : "House rules"}</h1>
+        <p>{confirmation?.confirmed ? `${confirmation.event.name} · ${eventDate(confirmation.event)}` : confirmation ? confirmation.alreadyAgreed ? "Your agreements are saved. Review them, then confirm attendance." : "Accept each rule to confirm attendance." : "These rules apply to every event."}</p>
       </div>
-      <div className="rules-list">
+      <div className="rules-list" hidden={confirmation?.confirmed}>
         {houseRules.map((rule, index) => confirmation ? (
           <article className="rule rule-with-acceptance" key={rule.id} data-accepted={acceptedIds.includes(rule.id)}>
             <h3><button type="button" className="rule-heading" aria-expanded={!collapsedIds.includes(rule.id)} aria-controls={`rule-body-${rule.id}`}
@@ -91,13 +89,13 @@ export function HouseRules({ confirmation }: { confirmation?: {
         <div className="rules-confirmation">
           <p className="rules-confirmation-event">{confirmation.event.name} · {eventDate(confirmation.event)}</p>
           <button className="text-link" disabled={confirmation.saving || confirmation.confirmed} onClick={confirmation.onBack}>Back to event</button>
-          <p className="rules-confirmation-note">Your agreement applies to every gathering. We’ll only ask again if the rules change.</p>
+          <p className="rules-confirmation-note">Agreements are saved for all events. You’ll need to agree again if the rules change.</p>
         </div>
         <div className="rules-confirmation-dock" ref={dock}>
           <div className="rules-dock-content">
             <div className="rules-progress">
               <div className="rules-progress-heading">
-                <span>Our shared agreements</span>
+                <span>House rules</span>
                 <span id="rules-acceptance-status" role="status">{acceptedCount} of {houseRules.length} agreed</span>
               </div>
               <div className="rules-progress-track" aria-hidden="true">
@@ -110,7 +108,7 @@ export function HouseRules({ confirmation }: { confirmation?: {
                 buttonRef={confirmButton} describedBy="rules-acceptance-status" disabled={disabled}
                 label="Confirm attendance" loadingLabel="Confirming…" successLabel="You’re going"
                 onClick={() => { if (allAccepted && !disabled) confirmation.onConfirm(houseRules.filter(rule => acceptedIds.includes(rule.id)).map(rule => rule.id)); }} />
-              <span className="rules-save-status" role="status">{confirmation.confirmed ? "See you there." : confirmation.saving ? "Saving your attendance…" : "You’re ready to join."}</span>
+              <span className="rules-save-status" role="status">{confirmation.confirmed ? "Attendance confirmed." : confirmation.saving ? "Saving your response…" : "All rules accepted."}</span>
             </div>}
           </div>
         </div>

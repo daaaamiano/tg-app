@@ -1,5 +1,8 @@
 import { openTelegramLogin, type TelegramLoginChallenge } from "./lib/telegramLoginPopup";
 import { accessDeniedCopy } from "./lib/accessCopy";
+import { initializeTelegram } from "./lib/telegram";
+
+initializeTelegram();
 
 const signin = document.getElementById("signin") as HTMLButtonElement;
 const signout = document.getElementById("signout") as HTMLButtonElement;
@@ -14,9 +17,9 @@ function setAuthenticating(authenticating: boolean) {
   main.classList.toggle("authenticating", authenticating);
   main.setAttribute("aria-busy", String(authenticating));
   signin.hidden = authenticating;
-  heading.innerHTML = "Sign in to view<br>your invitations.";
+  heading.textContent = "Sign in";
   description.textContent = authenticating
-    ? "Please wait while we check your Telegram account."
+    ? "Checking your Telegram account…"
     : "Sign in with Telegram to continue.";
   if (authenticating) status.textContent = "Authenticating with Telegram…";
 }
@@ -92,7 +95,6 @@ signout.onclick = async () => {
 
 const initData = window.Telegram?.WebApp?.initData;
 if (initData) {
-  window.Telegram!.WebApp!.ready();
   void authenticate({ initData }).catch((error) => {
     status.textContent = error instanceof Error ? error.message : "Telegram sign-in failed.";
     void prepare();

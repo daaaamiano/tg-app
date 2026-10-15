@@ -169,16 +169,15 @@ export function EventParticipation({ event, user, organizer, preview, section, o
     {section === "event" && children(
       <section className="event-rsvp" aria-label="Your attendance response">
         <div className="event-rsvp-heading">
-          <h2>Your response</h2>
+          <h2>Are you coming?</h2>
           <span className={`attendance-badge ${response === "going" ? "attendance-confirmed" : ""}`}>
-            {response === "going" ? <><Check size={13} /> Going · Confirmed</> : response ? labels[response] : loading ? "Loading…" : organizer ? "Organizer" : "Invitation"}
+            {response === "going" ? <><Check size={13} /> Going</> : response === "pending" ? "No response" : response ? labels[response] : loading ? "Loading…" : organizer ? "Organizer" : "Invitation"}
           </span>
         </div>
-        {event.inviteOnly && <p className="event-rsvp-group">Attendance by invitation only.</p>}
         {loading && !attendance && <p role="status" className="participation-loading">Loading your response…</p>}
         {attendance?.canRespond ? <div className="invitation-response">
           <div className="invitation-response-buttons" role="group" aria-label="Your attendance response">
-            <button className={response === "going" ? "primary-button" : "outline-button"} aria-pressed={response === "going"} disabled={saving || past} onClick={() => void reply("going")}><Check size={15} /> Going</button>
+            <button className="primary-button" aria-pressed={response === "going"} disabled={saving || past} onClick={() => void reply("going")}><Check size={15} /> Going</button>
             <button className={response === "not-going" ? "primary-button" : "outline-button"} aria-pressed={response === "not-going"} disabled={saving || past} onClick={() => void reply("not-going")}>Not going</button>
             <button className="text-link" aria-pressed={response === "pending"} disabled={saving || past} onClick={() => void reply("pending")}><Clock3 size={14} /> Decide later</button>
           </div>
@@ -192,7 +191,7 @@ export function EventParticipation({ event, user, organizer, preview, section, o
       </section>
     )}
     {section === "people" && <section className="event-people" aria-labelledby="event-people-title">
-      <div className="people-heading"><div><span className="eyebrow">{event.name} / {eventDate(event)}</span><h1 id="event-people-title">People.</h1></div><button className="text-link" disabled={loading || saving} onClick={() => setVersion(value => value + 1)}><RefreshCw size={14} /> Refresh</button></div>
+      <div className="people-heading"><h2 id="event-people-title">People</h2><button className="text-link" disabled={loading || saving} onClick={() => setVersion(value => value + 1)}><RefreshCw size={14} /> Refresh</button></div>
       <p>{organizer ? "Only Going counts as confirmed attendance." : "Only confirmed attendees are listed."}</p>
       {attendance?.notice && <p className="member-notice" role="status">{attendance.notice}</p>}
       {organizer && <div className="events-tabs people-filters" role="group" aria-label="Filter attendance responses">{(["going", "pending", "not-going"] as const).map(state => <button key={state} className={filter === state ? "selected" : ""} aria-pressed={filter === state} onClick={() => setFilter(state)}>{state === "pending" && attendance?.complete === false ? "Known pending" : labels[state]}<span>{attendance?.people.filter(person => person.response === state).length ?? 0}</span></button>)}</div>}

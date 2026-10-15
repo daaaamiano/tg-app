@@ -121,7 +121,7 @@ it("opens rules before first attendance, cancels without saving, and saves agree
   await act(async () => { buttons()[0].props.onClick(); });
   expect(onRulesRequired).toHaveBeenCalledOnce();
   expect(api.mock.calls.filter(([route]) => route === "rsvp")).toHaveLength(0);
-  expect(JSON.stringify(renderer.toJSON())).toContain("Before");
+  expect(JSON.stringify(renderer.toJSON())).toContain("House rules");
   expect(renderer.root.findAllByProps({ className: "rule rule-with-acceptance" })).toHaveLength(5);
   await act(async () => { backButton().props.onClick(); });
   expect(response).toBe("pending");
