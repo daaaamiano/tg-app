@@ -177,7 +177,7 @@ export function EventParticipation({ event, user, organizer, preview, section, o
         {loading && !attendance && <p role="status" className="participation-loading">Loading your response…</p>}
         {attendance?.canRespond ? <div className="invitation-response">
           <div className="invitation-response-buttons" role="group" aria-label="Your attendance response">
-            <button className="primary-button" aria-pressed={response === "going"} disabled={saving || past} onClick={() => void reply("going")}><Check size={15} /> Going</button>
+            <button className={response === "going" ? "primary-button" : "outline-button"} aria-pressed={response === "going"} disabled={saving || past} onClick={() => void reply("going")}><Check size={15} /> Going</button>
             <button className={response === "not-going" ? "primary-button" : "outline-button"} aria-pressed={response === "not-going"} disabled={saving || past} onClick={() => void reply("not-going")}>Not going</button>
             <button className="text-link" aria-pressed={response === "pending"} disabled={saving || past} onClick={() => void reply("pending")}><Clock3 size={14} /> Decide later</button>
           </div>

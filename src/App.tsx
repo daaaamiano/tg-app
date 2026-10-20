@@ -15,6 +15,7 @@ import { GroupApprovals } from "./components/GroupApprovals";
 import { TelegramBrowserLogin } from "./components/TelegramBrowserLogin";
 import { EventDetails, EventHeading } from "./components/EventDetails";
 import { LottieAnimation } from "./components/LottieAnimation";
+import { RopeMark } from "./components/RopeMark";
 import { useWebAccount } from "./components/AppAuthProvider";
 import { HouseRules } from "./components/HouseRules";
 import {
@@ -22,7 +23,7 @@ import {
   authenticateTelegram,
   getEvent,
   logoutTelegram,
-  usingMockData,
+  demoAccountEnabled,
 } from "./lib/api";
 import {
   downloadCalendar,
@@ -77,7 +78,7 @@ export default function App() {
   const organization = useOrganizationAccount();
   const auth: AuthSession | null = organization.session
     ? { user: organization.session.user, mode: "verified" }
-    : webAccount.session ?? localAuth;
+    : webAccount.session ?? (localAuth && (demoAccountEnabled || localAuth.mode === "verified") ? localAuth : null);
   const isSystemAdmin = organization.session?.isSystemAdmin === true;
   const canViewEvents = isSystemAdmin || organization.session?.canViewEvents === true;
   const inTelegram = isInTelegram();
@@ -88,7 +89,7 @@ export default function App() {
     filterEvents(allEvents, "upcoming", now)[0] ??
     filterEvents(allEvents, "past", now)[0];
   const isPast = event ? new Date(event.endsAt) <= now : false;
-  const previewParticipation = !privateServiceMode && !organization.session && (auth?.mode === "demo" || auth?.mode === "telegram-preview");
+  const previewParticipation = demoAccountEnabled && !organization.session && (auth?.mode === "demo" || auth?.mode === "telegram-preview");
   const showParticipation = Boolean(organization.session || previewParticipation);
   const confirmingRules = view === "rules" && rulesEventId === event?.id && showParticipation && Boolean(auth);
 
@@ -180,7 +181,7 @@ export default function App() {
         return;
       }
       setAuthError(
-        "The Telegram bot is not connected yet. You can use web sign-in or explore the preview."
+        "Telegram sign-in is not configured. Contact the organizer."
       );
       return;
     }
@@ -193,6 +194,7 @@ export default function App() {
         const response = await authenticateTelegram(telegram.initData);
         setLocalAuth({ user: response.user, mode: "verified" });
       } else {
+        if (!demoAccountEnabled) throw new Error("Telegram verification is not configured. Contact the organizer.");
         const user = telegram.initDataUnsafe.user;
         if (!user)
           throw new Error(
@@ -258,7 +260,7 @@ export default function App() {
   // Clear the private UI after session expiry/logout even when the JS is already loaded.
   if (privateServiceMode && !canViewEvents) return (
     <div className="app-shell">
-      <header className="site-header"><span className="wordmark"><CalendarDays size={23} /> Rope Jam</span></header>
+      <header className="site-header"><span className="wordmark"><RopeMark /> Private Rope Jam</span></header>
       <main><section className="empty-state">
         <span className="eyebrow">PRIVATE ROPE JAM</span>
         <h1>{!organization.loading && organization.session ? accessDeniedCopy.title : "Sign in to view invitations."}</h1>
@@ -284,8 +286,8 @@ export default function App() {
           }}
           aria-label="Private Rope Jam home"
         >
-          <CalendarDays size={23} />
-          <span>Rope Jam<small>Events</small></span>
+          <RopeMark />
+          <span>private rope jam<span className="wordmark-dot">.</span><small>Events</small></span>
         </button>
         <nav className="desktop-nav" aria-label="Main navigation">
           <button
@@ -647,17 +649,18 @@ export default function App() {
                   : "Continue with Telegram"}
                 <ArrowUpRight size={16} />
               </button>}
-              {inTelegram && !apiConfigured && !organizationAuthAvailable && (
+              {demoAccountEnabled && inTelegram && !apiConfigured && !organizationAuthAvailable && (
                 <p className="login-note">
                   Profile preview only. Telegram verification will be connected
                   with the event backend.
                 </p>
               )}
-              {usingMockData && !privateServiceMode && (
+              {demoAccountEnabled && (
                 <button
                   className="text-link demo-link"
                   disabled={authBusy || webAccount.isLoading}
                   onClick={() => {
+                    if (!demoAccountEnabled) return;
                     setLocalAuth({
                       user: { id: 0, first_name: "Guest" },
                       mode: "demo",

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, CalendarDays, MapPin, ShieldCheck, Ticket } from "lucide-react";
+import { CalendarDays, Map, MapPin, ShieldCheck, Ticket } from "lucide-react";
+import { InstagramIcon } from "./InstagramIcon";
 import type { RopeEvent } from "../types/event";
 import { eventDate, eventTime, mapsUrl } from "../lib/events";
 
@@ -20,7 +21,13 @@ export function EventDetails({ event, isPast, responseBox, showHeading, onCalend
     {showHeading && <EventHeading event={event} />}
     <div className="event-facts">
       <div className="event-fact"><CalendarDays size={20} /><div><h2><time dateTime={event.startsAt}>{new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "long", year: "numeric", timeZone: event.timeZone }).format(new Date(event.startsAt))}</time></h2><p>{eventTime(event)}–{eventTime(event, event.endsAt)} · Doors at {eventTime(event, event.arrivalFrom)}</p><small>Barcelona time</small></div></div>
-      <div className="event-fact"><MapPin size={20} /><div><h2>{event.venue}</h2><p>{event.address}</p><small>{event.neighborhood}, {event.city}</small></div><a className="fact-action" href={mapsUrl(event)} target="_blank" rel="noreferrer" aria-label={`Directions to ${event.venue}`}><ArrowUpRight size={20} /></a></div>
+      <div className="event-fact"><MapPin size={20} /><div>
+        <div className="venue-heading"><h2>{event.venue}</h2><div className="venue-links">
+          <a href={mapsUrl(event)} target="_blank" rel="noreferrer" aria-label={`Open ${event.venue} in Google Maps`} title="Google Maps"><Map size={18} aria-hidden="true" /></a>
+          {event.venueInstagramUrl && <a href={event.venueInstagramUrl} target="_blank" rel="noreferrer" aria-label={`${event.venue} on Instagram`} title="Instagram"><InstagramIcon /></a>}
+        </div></div>
+        <p>{event.address}</p><small>{event.neighborhood}, {event.city}</small>
+      </div></div>
       <div className="event-fact"><Ticket size={20} /><div><h2>{new Intl.NumberFormat("en-GB", { style: "currency", currency: event.currency }).format(event.price)} per person</h2><p>{event.capacity} people max{event.inviteOnly ? " · Invite only" : ""}</p></div></div>
     </div>
     {responseBox}

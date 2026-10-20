@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1100" role="img" aria-labelledby="title description">
+  <title id="title">Private Rope Jam — Sunday, 15 November 2026</title>
+  <desc id="description">Shibari practice at LabCultural, Barcelona. 19:00–21:00, doors at 18:30. €8.50 per person. Ten people maximum, invitation only.</desc>
+  <rect width="800" height="1100" fill="#eeeae1"/>
+  <rect x="35" y="35" width="730" height="1030" fill="none" stroke="#d5d0c4"/>
+  <g fill="none" stroke="#91806a" stroke-width="3" transform="translate(375 76) scale(1.6)">
+    <path d="M9-3C24 6 0 10 14 19S1 31 11 42M22-3C4 10 32 14 19 23S31 34 21 42"/>
+    <path d="M8 18C10 13 21 14 23 20S11 27 8 21"/>
+  </g>
+  <g text-anchor="middle" fill="#30322e">
+    <text x="400" y="211" font-family="Arial, sans-serif" font-size="17" letter-spacing="4">PRIVATE SHIBARI PRACTICE</text>
+    <text x="400" y="337" font-family="Georgia, serif" font-size="83">Private</text>
+    <text x="400" y="432" font-family="Georgia, serif" font-size="83" font-style="italic">Rope Jam.</text>
+    <path d="M100 484H700" stroke="#d5d0c4"/>
+    <text x="400" y="549" font-family="Arial, sans-serif" font-size="19" letter-spacing="3">SUNDAY</text>
+    <text x="400" y="610" font-family="Georgia, serif" font-size="45">15 November 2026</text>
+    <text x="400" y="662" font-family="Arial, sans-serif" font-size="29">19:00–21:00</text>
+    <text x="400" y="700" font-family="Arial, sans-serif" font-size="18" fill="#625e53">Doors at 18:30 · Barcelona time</text>
+    <path d="M100 745H700" stroke="#d5d0c4"/>
+    <text x="400" y="811" font-family="Georgia, serif" font-size="37">LabCultural</text>
+    <text x="400" y="853" font-family="Arial, sans-serif" font-size="20">Carrer del Rector Triadó, 11</text>
+    <text x="400" y="887" font-family="Arial, sans-serif" font-size="18" fill="#625e53">Sants, Barcelona</text>
+    <text x="400" y="963" font-family="Arial, sans-serif" font-size="23">€8.50 per person</text>
+    <text x="400" y="1003" font-family="Arial, sans-serif" font-size="16" fill="#625e53">10 people max · Invite only · One suspension point</text>
+  </g>
+</svg>

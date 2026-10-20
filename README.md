@@ -13,22 +13,25 @@ npm run dev
 
 Open http://127.0.0.1:5178. `npm run build` creates `dist/`, and `npm test` runs the authentication, event archive, and calendar tests.
 
-## The announced gathering
+## Announced events
 
-- **Private Rope Jam** — Friday 16 October 2026, 19:00–21:00, Barcelona time.
+- **Private Rope Jam** — Sunday 15 November 2026, 19:00–21:00, Barcelona time (CET).
+- Previous event: Friday 16 October 2026, 19:00–21:00 (CEST).
 - Arrivals from **18:30**, up to 30 minutes early.
 - **8.50€** per person; **10 people**, all vetted, invite-only.
 - **LabCultural**, Carrer del Rector Triadó, 11, Sants, Barcelona.
 - One suspension point; check with the host before using it.
 - Explicit rules covering consent, pronouns, privacy, discrimination, stop signals, sobriety, and respectful shared use of the room.
 
-The details come from the supplied poster and organizer instructions. The photo is used as provided at `public/private-rope-jam-poster.jpg`. No attendee identities are shown. House rules include an adults-only agreement.
+The original October photo is unchanged at `public/private-rope-jam-poster.jpg`. November uses a separate SVG poster with the correct Sunday date and the same venue, local hours, price, capacity, suspension point, and invitation policy. Map and Instagram icon buttons sit beside the venue name, with accessible labels and hover titles. House rules include an adults-only agreement.
 
-The interface uses system fonts, compact event rows, Telegram theme colors, and direct action labels. Event details, People, rules, account, organization tools, and the public sign-in screen share the same visual style. Original Lottie loading and success animations are bundled locally and loaded on demand. Reduced-motion preferences show static frames and disable transitions. The poster is available under Event poster.
+The interface combines the compact event rows with the legacy cream palette, DM Sans body text, Instrument Serif headings, rope branding, and direct action labels. Event details, People, rules, account, organization tools, and the public sign-in screen share the same visual style. Original Lottie loading and success animations are bundled locally and loaded on demand. Reduced-motion preferences show static frames and disable transitions. The poster is available under Event poster.
 
-**All events** has Upcoming and Past views. There is only one announced event; no fake history or future dates. Events move to Past after their end time, using timestamp offsets. Add actual events in `src/data/eventCatalog.ts`; `src/lib/events.ts` handles ordering, local-time display, and calendar export.
+**All events** has Upcoming and Past views for the October and November events. Events move to Past after their end time, using timestamp offsets. Add actual events in `src/data/eventCatalog.ts`; `src/lib/events.ts` handles ordering, local-time display, and calendar export.
 
 **Add to calendar** downloads an `.ics` file with the correct time zone conversion. The calendar entry is not a reservation. There is no payment, booking, attendee approval, or check-in backend. Signing in does not confirm attendance; the host does.
+
+Demo accounts are off by default, including locally. An explicit developer-only `VITE_ENABLE_DEMO=true` opt-in in `.env.local` enables the browser demo only during `npm run dev` with mock data. Production, private-service, and API builds cannot enable it. Demo/preview identities never authorize private API requests.
 
 ## Legacy backup and rollback
 
@@ -56,7 +59,7 @@ The Telegram redesign keeps the current agreement version and IDs and does not r
 - `src/lib/events.ts`: chronological event lists, Barcelona-time formatting, Maps links, and calendar download.
 - `src/components/AppAuthProvider.tsx`: web account integration.
 - `src/lib/api.ts`: authenticated event invitations and public development preview; `server/eventAttendance.ts`: event groups, membership checks, and saved responses.
-- `src/styles.css`: responsive Telegram-style design with Telegram/system light and dark themes.
+- `src/styles.css`: compact layout with the legacy cream palette, typography, and Telegram safe-area support.
 - `src/lib/telegram.ts`: Telegram theme updates and system chrome colors.
 
 ## Set up new web credentials (WorkOS AuthKit)

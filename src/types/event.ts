@@ -9,6 +9,7 @@ export interface RopeEvent {
   currency: "EUR";
   capacity: number;
   venue: string;
+  venueInstagramUrl?: string;
   address: string;
   neighborhood: string;
   city: string;

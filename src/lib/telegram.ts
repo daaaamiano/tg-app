@@ -15,13 +15,13 @@ export function initializeTelegram() {
       if (value && /^#[0-9a-f]{6}$/i.test(value)) document.documentElement.style.setProperty(property, value);
       else document.documentElement.style.removeProperty(property);
     }
-    const fallback = app.colorScheme === "dark" ? "#17212b" : "#eff1f5";
-    const background = colors.secondary_bg_color && /^#[0-9a-f]{6}$/i.test(colors.secondary_bg_color) ? colors.secondary_bg_color : fallback;
+    // Keep Telegram's surrounding chrome aligned with the legacy paper palette.
+    const background = "#eeeae1";
     if (app.isVersionAtLeast("6.1")) {
-      app.setHeaderColor("bg_color");
+      app.setHeaderColor(background);
       app.setBackgroundColor(background);
     }
-    if (app.isVersionAtLeast("7.10")) app.setBottomBarColor?.(colors.bottom_bar_bg_color && /^#[0-9a-f]{6}$/i.test(colors.bottom_bar_bg_color) ? colors.bottom_bar_bg_color : background);
+    if (app.isVersionAtLeast("7.10")) app.setBottomBarColor?.(background);
   };
   syncTheme();
   app.onEvent?.("themeChanged", syncTheme);

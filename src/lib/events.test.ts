@@ -5,10 +5,26 @@ import { eventCalendar, eventDate, eventTime, filterEvents } from "./events";
 const event = demoEvent.events[0];
 
 describe("event browsing", () => {
-  it("shows the only announced event before it ends and leaves the archive empty", () => {
+  it("shows both announced dates before they end and leaves the archive empty", () => {
     const now = new Date("2026-10-07T12:00:00Z");
-    expect(filterEvents(demoEvent.events, "upcoming", now)).toEqual([event]);
+    expect(filterEvents(demoEvent.events, "upcoming", now)).toEqual(demoEvent.events);
     expect(filterEvents(demoEvent.events, "past", now)).toEqual([]);
+  });
+
+  it("shows Sunday 15 November next, with the same details and winter-time hours", () => {
+    const [next] = filterEvents(demoEvent.events, "upcoming", new Date("2026-10-20T12:00:00Z"));
+    expect(next.id).toBe("private-rope-jam-2026-11-15");
+    expect(eventDate(next)).toBe("Sunday, 15 November 2026");
+    expect(eventTime(next)).toBe("19:00");
+    expect(eventTime(next, next.arrivalFrom)).toBe("18:30");
+    expect(eventTime(next, next.endsAt)).toBe("21:00");
+    expect(next).toMatchObject({ venue: event.venue, address: event.address, price: event.price, capacity: event.capacity,
+      suspensionPoints: event.suspensionPoints, inviteOnly: true, venueInstagramUrl: "https://www.instagram.com/labcultural.barcelona/" });
+    expect(next.poster).not.toBe(event.poster);
+    const calendar = eventCalendar(next).replace(/\r\n /g, "");
+    expect(calendar).toContain("DTSTART:20261115T180000Z");
+    expect(calendar).toContain("DTEND:20261115T200000Z");
+    expect(filterEvents(demoEvent.events, "past", new Date("2026-10-20T12:00:00Z"))).toEqual([event]);
   });
 
   it("keeps a running jam upcoming, then archives it at its actual end", () => {

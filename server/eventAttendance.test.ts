@@ -172,7 +172,7 @@ it("integrates verified sign-in, event access, RSVP and People with server-deriv
   const post = (route: string, cookie: string, body: object, source = origin) => request(app).post(`/api/telegram/${route}`).set("Host", "private.example").set("Origin", source).set("Cookie", cookie).send(body);
   expect((await get("events")).status).toBe(401);
   const cookie = await login(234);
-  expect((await get("events", cookie)).body.events).toHaveLength(1);
+  expect((await get("events", cookie)).body.events).toHaveLength(eventCatalog.length);
   expect((await get(`attendance?eventId=${eventId}`, cookie)).body.response).toBe("pending");
   expect((await post("rsvp", cookie, { eventId, response: "going", userId: "456" }, "https://elsewhere.test")).status).toBe(403);
   expect((await post("rsvp", cookie, { eventId, response: ["going"] })).status).toBe(400);
@@ -203,7 +203,7 @@ it("integrates verified sign-in, event access, RSVP and People with server-deriv
   const organizer = await login(17666600);
   expect((await post("event-group", organizer, { eventId, chatId: "-456" })).status).toBe(200);
   fixtureData.membership.get("-456")!.delete(234);
-  expect((await get("events", cookie)).body.events).toEqual([]);
+  expect((await get("events", cookie)).body.events.map((item: { id: string }) => item.id)).toEqual([eventCatalog[1].id]);
   expect((await get(`attendance?eventId=${eventId}`, cookie)).status).toBe(403);
   expect((await post("rsvp-notification", cookie, { eventId, response: "pending" })).status).toBe(403);
   for (const path of ["/private-rope-jam-poster.jpg", "/private%2Drope-jam-poster.jpg", "/private-rope-jam-poster.jpg/"])

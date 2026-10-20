@@ -4,6 +4,11 @@ import { organizationRequest } from "./organization";
 const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
 export const apiConfigured = Boolean(baseUrl);
 export const usingMockData = import.meta.env.VITE_DATA_SOURCE !== "api";
+// Explicit developer opt-in only. Production builds can never enable demo accounts.
+export const demoAccountEnabled = import.meta.env.DEV
+  && import.meta.env.VITE_PRIVATE_SERVICE !== "true"
+  && usingMockData
+  && import.meta.env.VITE_ENABLE_DEMO === "true";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!baseUrl)

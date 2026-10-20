@@ -291,6 +291,8 @@ it("supports Not going and returning to Pending while an earlier permission requ
   await confirmReturningAttendance();
   await act(async () => { buttons()[1].props.onClick(); });
   expect(buttons()[1].props["aria-pressed"]).toBe(true);
+  expect(buttons()[0].props.className).toBe("outline-button");
+  expect(buttons()[1].props.className).toBe("primary-button");
   await act(async () => { buttons()[2].props.onClick(); });
   expect(response).toBe("pending");
   expect(buttons()[2].props["aria-pressed"]).toBe(true);

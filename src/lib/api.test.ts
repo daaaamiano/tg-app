@@ -7,6 +7,22 @@ afterEach(() => {
 });
 
 describe("event and Telegram API boundary", () => {
+  it.each([
+    [true, "false", "mock", "false", false],
+    [true, "false", "mock", "true", true],
+    [false, "false", "mock", "true", false],
+    [true, "true", "mock", "true", false],
+    [false, "true", "mock", "true", false],
+    [true, "false", "api", "true", false],
+  ] as const)("limits demo accounts to explicitly enabled local development (%s, %s, %s, %s)", async (dev, privateService, source, enabled, expected) => {
+    vi.stubEnv("DEV", dev);
+    vi.stubEnv("VITE_PRIVATE_SERVICE", privateService);
+    vi.stubEnv("VITE_DATA_SOURCE", source);
+    vi.stubEnv("VITE_ENABLE_DEMO", enabled);
+    const { demoAccountEnabled } = await import("./api");
+    expect(demoAccountEnabled).toBe(expected);
+  });
+
   it("loads private event invitations through the authenticated same-origin endpoint, even with mock configured", async () => {
     vi.stubEnv("VITE_PRIVATE_SERVICE", "true");
     vi.stubEnv("VITE_DATA_SOURCE", "mock");

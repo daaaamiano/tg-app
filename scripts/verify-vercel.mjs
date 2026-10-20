@@ -69,7 +69,9 @@ try {
   assert(signin.text.includes("https://oauth.telegram.org"));
   assert(signin.text.includes("origin:window.location.origin"));
   const frontendAssets = assets.filter(name => /\.(js|css)$/.test(name)).map(name => `/assets/${name}`);
-  for (const path of [...frontendAssets, "/private-rope-jam-poster.jpg", "/api/telegram/group-members?chatId=-123"])
+  const posters = (await readdir(`${artifact}/private`)).filter(name => /^private-rope-jam.*\.(jpg|svg)$/.test(name)).map(name => `/${name}`);
+  assert.equal(posters.length, 2);
+  for (const path of [...frontendAssets, ...posters, "/api/telegram/group-members?chatId=-123"])
     assert.equal((await get(first, path)).status, 401);
   const fields = { auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify({ id: 17666600, first_name: "Test admin" }) };
   const check = Object.entries(fields).map(([k, v]) => `${k}=${v}`).join("\n");
@@ -81,9 +83,10 @@ try {
   assert.equal((await get(second, "/api/telegram/session", cookie)).body.session.isSystemAdmin, true);
   const authorized = await get(second, bundle, cookie);
   assert.equal(authorized.status, 200);
+  assert(!authorized.text.includes("Explore with a demo profile"), "Demo account entry must be removed from production builds.");
   for (const path of frontendAssets) assert.equal((await get(second, path, cookie)).status, 200);
   assert.equal(authorized.headers["cache-control"], "private, no-store");
-  for (const detail of ["LabCultural", "Rector Triadó", "2026-10-16T19:00:00"])
+  for (const detail of ["LabCultural", "Rector Triadó", "2026-10-16T19:00:00", "2026-11-15T19:00:00"])
     assert(!authorized.text.includes(detail), "Private event content must be fetched after event authorization.");
   const post = (handler, route, sessionCookie, body) => request(handler).post(`/api/telegram/${route}`).set("Host", "private.example").set("Origin", origin).set("Cookie", sessionCookie).send(body);
   assert.equal((await get(first, "/api/telegram/groups", cookie)).status, 200);
@@ -96,8 +99,13 @@ try {
   const memberCookie = memberLogin.headers["set-cookie"][0].split(";")[0];
   const invitations = await get(second, "/api/telegram/events", memberCookie);
   assert.equal(invitations.status, 200);
-  assert.equal(invitations.body.events.length, 1);
-  const eventId = invitations.body.events[0].id;
+  assert.equal(invitations.body.events.length, 2);
+  const nextEvent = invitations.body.events.find(event => event.id === "private-rope-jam-2026-11-15");
+  assert(nextEvent);
+  assert.equal(nextEvent.startsAt, "2026-11-15T19:00:00+01:00");
+  assert.equal(nextEvent.venueInstagramUrl, "https://www.instagram.com/labcultural.barcelona/");
+  for (const path of posters) assert.equal((await get(second, path, memberCookie)).status, 200);
+  const eventId = nextEvent.id;
   const attendancePath = `/api/telegram/attendance?eventId=${encodeURIComponent(eventId)}`;
   const initialAttendance = (await get(first, attendancePath, memberCookie)).body;
   const houseRulesVersion = initialAttendance.rules.version;
@@ -114,7 +122,7 @@ try {
   assert.equal((await get(second, attendancePath, memberCookie)).body.people.length, 0);
   assert.equal((await post(second, "group-approval", cookie, { chatId: "-123", approved: false })).status, 200);
   assert.deepEqual((await get(first, "/api/telegram/events", memberCookie)).body.events, []);
-  assert.equal((await get(second, "/private-rope-jam-poster.jpg", memberCookie)).status, 403);
+  for (const path of posters) assert.equal((await get(second, path, memberCookie)).status, 403);
   assert.equal((await request(second).post("/api/telegram/logout").set("Host", "private.example").set("Origin", origin).set("Cookie", cookie)).status, 200);
   assert.equal((await get(first, bundle, cookie)).status, 401);
   console.log("Packaged Vercel function verified: shared sessions and RSVPs, group revocation, protected event content, private files, no public static assets.");

@@ -15,14 +15,15 @@ it("syncs Telegram theme changes and removes stale colors without accepting malf
   const cleanup = initializeTelegram();
   expect(root.dataset.telegramTheme).toBe("dark");
   expect(properties.get("--tg-theme-button-color")).toBe("#5cbbf6");
-  expect(app.setHeaderColor).toHaveBeenCalledWith("bg_color");
-  expect(app.setBackgroundColor).toHaveBeenCalledWith("#17212b");
+  expect(app.setHeaderColor).toHaveBeenCalledWith("#eeeae1");
+  expect(app.setBackgroundColor).toHaveBeenCalledWith("#eeeae1");
   app.colorScheme = "light";
   app.themeParams = { secondary_bg_color: "invalid", button_color: "url(https://example.com)" };
   changed();
   expect(root.dataset.telegramTheme).toBe("light");
   expect(properties.has("--tg-theme-button-color")).toBe(false);
-  expect(app.setBackgroundColor).toHaveBeenLastCalledWith("#eff1f5");
+  expect(app.setBackgroundColor).toHaveBeenLastCalledWith("#eeeae1");
+  expect(app.setBottomBarColor).toHaveBeenLastCalledWith("#eeeae1");
   cleanup?.();
   expect(app.offEvent).toHaveBeenCalledWith("themeChanged", changed);
 });
